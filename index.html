@@ -14,16 +14,15 @@
     
     <style>
         body { font-family: 'Inter', sans-serif; }
-        /* JIT Compilation Hack for dynamic classes */
+        /* Classes for dynamic injection */
         .text-indigo-400, .text-gray-400, .text-green-400, .text-yellow-400, .text-red-400, .text-red-500, .text-teal-400, .text-purple-400, .text-lime-400 {}
         .bg-blue-600, .bg-green-600, .bg-orange-600, .bg-purple-600, .bg-red-600, .bg-yellow-500, .bg-teal-600 {}
+        .bg-blue-500, .bg-green-500, .bg-orange-500, .bg-purple-500 {}
         
         .progress-card { transition: transform 0.2s, box-shadow 0.2s; }
-        .progress-card:hover { transform: translateY(-3px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2); }
+        .progress-card:hover { transform: translateY(-3px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3); }
         .modal { transition: opacity 0.3s ease-in-out; }
         
-        @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(99, 102, 241, 0); } }
-        .pulse-effect { animation: pulse 2s infinite; }
         @keyframes blink-urgent { 50% { opacity: 0.5; } }
         .blinking-urgent { animation: blink-urgent 1s ease-in-out infinite; }
         
@@ -37,6 +36,9 @@
             animation: spin 1s linear infinite;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Progress Bar Background Animation */
+        .progress-fill { transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
     </style>
 </head>
 <body class="bg-gray-900 min-h-screen text-gray-100 flex flex-col">
@@ -61,7 +63,6 @@
                 </div>
 
                 <div class="flex items-center gap-2 w-full md:w-auto overflow-x-auto pb-1 md:pb-0 justify-end">
-                    
                     <div class="flex bg-gray-700/50 rounded-lg p-1 mr-2 border border-gray-600">
                         <button onclick="loadData()" title="Force Refresh" class="p-2 text-gray-300 hover:text-white hover:bg-gray-600 rounded-md transition">
                              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
@@ -70,12 +71,10 @@
                              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
                         </button>
                     </div>
-
                     <button id="btnAddProject" class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg font-medium shadow-lg hover:shadow-indigo-500/30 transition transform hover:-translate-y-0.5 whitespace-nowrap">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" /></svg>
                         <span>New Project</span>
                     </button>
-                    
                     <button id="btnDeleteAll" title="Reset All Data" class="ml-2 bg-red-900/30 hover:bg-red-600 text-red-200 hover:text-white p-2 rounded-lg transition border border-red-900/50">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 012 0v6a1 1 0 11-2 0V8z" clip-rule="evenodd" /></svg>
                     </button>
@@ -86,8 +85,32 @@
 
     <div class="container mx-auto px-4 pb-8 flex-grow">
         
-        <div id="dashboard-header" class="mb-6 hidden">
-             </div>
+        <div id="dashboard-header-container" class="mb-6 hidden">
+             <div class="bg-gray-800 p-4 rounded-xl shadow-lg flex flex-wrap justify-between items-center border border-gray-700">
+                <div class="flex items-center gap-4">
+                    <div class="text-sm">
+                        <span class="text-gray-400">Total Output:</span>
+                        <span id="header-total-output" class="text-xl font-bold text-white ml-1">0</span>
+                        <span id="header-total-target" class="text-gray-500 text-xs"> / 0</span>
+                    </div>
+                    <div class="h-8 w-px bg-gray-600"></div>
+                    <div class="text-sm">
+                        <span class="text-gray-400">Efficiency:</span>
+                        <span id="header-efficiency" class="text-xl font-bold text-lime-400 ml-1">0.0%</span>
+                    </div>
+                </div>
+                
+                <div class="flex items-center mt-2 sm:mt-0">
+                    <select onchange="window.setFilter(this.value)" class="bg-gray-700 text-sm rounded border border-gray-600 p-1 focus:ring-indigo-500 text-white">
+                        <option value="All">All Status</option>
+                        <option value="In Progress">In Progress</option>
+                        <option value="Completed">Completed</option>
+                        <option value="Urgent">Urgent Only</option>
+                    </select>
+                    <div class="ml-4 text-xs text-indigo-300 font-mono" id="live-clock">--:--</div>
+                </div>
+            </div>
+        </div>
 
         <div id="notification-box" class="opacity-0 pointer-events-none fixed top-20 right-4 p-4 rounded-lg text-white shadow-xl z-50 transition-all duration-300"></div>
 
@@ -167,16 +190,16 @@
 
     <div id="editProjectModal" class="modal fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 opacity-0 pointer-events-none p-4 backdrop-blur-sm">
         <div class="bg-gray-800 rounded-xl w-full max-w-lg border border-gray-700">
-            <div class="p-6 border-b border-gray-700 flex justify-between"><h2 class="text-xl font-bold">Edit Assembly</h2><button onclick="closeModal('editProjectModal')" class="text-gray-400">✕</button></div>
+            <div class="p-6 border-b border-gray-700 flex justify-between"><h2 class="text-xl font-bold text-gray-100">Edit Assembly</h2><button onclick="closeModal('editProjectModal')" class="text-gray-400">✕</button></div>
             <form id="editProjectForm" class="p-6 space-y-4">
-                <input type="text" id="editProjectName" required class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg">
-                <input type="number" id="editProjectQuantity" required class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg">
-                <div class="flex items-center"><input id="editProjectHasPallet" type="checkbox" class="w-5 h-5"><label for="editProjectHasPallet" class="ml-2">Pallet Stage</label></div>
-                <div class="flex items-center"><input id="editProjectUrgent" type="checkbox" class="w-5 h-5"><label for="editProjectUrgent" class="ml-2">Urgent</label></div>
+                <input type="text" id="editProjectName" required class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white">
+                <input type="number" id="editProjectQuantity" required class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white">
+                <div class="flex items-center"><input id="editProjectHasPallet" type="checkbox" class="w-5 h-5"><label for="editProjectHasPallet" class="ml-2 text-gray-300">Pallet Stage</label></div>
+                <div class="flex items-center"><input id="editProjectUrgent" type="checkbox" class="w-5 h-5"><label for="editProjectUrgent" class="ml-2 text-gray-300">Urgent</label></div>
                 <div id="edit-urgent-options" class="hidden grid grid-cols-2 gap-4">
-                    <input type="date" id="editProjectTargetDate" class="p-2 bg-gray-700 rounded"><input type="time" id="editProjectTargetTime" class="p-2 bg-gray-700 rounded">
+                    <input type="date" id="editProjectTargetDate" class="p-2 bg-gray-700 rounded text-white"><input type="time" id="editProjectTargetTime" class="p-2 bg-gray-700 rounded text-white">
                 </div>
-                <button type="submit" class="w-full bg-indigo-600 py-3 rounded-lg font-bold">Update</button>
+                <button type="submit" class="w-full bg-indigo-600 py-3 rounded-lg font-bold text-white">Update</button>
             </form>
         </div>
     </div>
@@ -186,7 +209,7 @@
             <h3 class="text-xl font-bold text-red-500 mb-2">Confirm Deletion</h3>
             <p id="deleteConfirmText" class="text-gray-300 mb-6">Are you sure?</p>
             <div class="flex justify-end gap-3">
-                <button onclick="closeModal('deleteConfirmModal')" class="px-4 py-2 bg-gray-700 rounded-lg">Cancel</button>
+                <button onclick="closeModal('deleteConfirmModal')" class="px-4 py-2 bg-gray-700 rounded-lg text-white">Cancel</button>
                 <button id="confirmDeleteButton" class="px-4 py-2 bg-red-600 text-white rounded-lg">Delete</button>
             </div>
         </div>
@@ -195,9 +218,9 @@
     <div id="deleteAllConfirmModal" class="modal fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 opacity-0 pointer-events-none backdrop-blur-sm">
         <div class="bg-gray-800 p-6 rounded-xl max-w-sm w-full border border-red-900/50">
             <h3 class="text-xl font-bold text-red-500 mb-2">RESET DATABASE</h3>
-            <p class="text-gray-300 mb-6">This will delete ALL projects and history from the Google Sheet. Irreversible.</p>
+            <p class="text-gray-300 mb-6">This will delete ALL projects and history. Irreversible.</p>
             <div class="flex justify-end gap-3">
-                <button onclick="closeModal('deleteAllConfirmModal')" class="px-4 py-2 bg-gray-700 rounded-lg">Cancel</button>
+                <button onclick="closeModal('deleteAllConfirmModal')" class="px-4 py-2 bg-gray-700 rounded-lg text-white">Cancel</button>
                 <button id="confirmDeleteAllButton" class="px-4 py-2 bg-red-600 text-white rounded-lg">Wipe Data</button>
             </div>
         </div>
@@ -205,12 +228,12 @@
 
     <div id="manualInputModal" class="modal fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 opacity-0 pointer-events-none">
         <div class="bg-gray-800 p-6 rounded-xl w-80">
-            <h3 id="manualInputModalTitle" class="text-lg font-bold mb-4">Update Progress</h3>
+            <h3 id="manualInputModalTitle" class="text-lg font-bold mb-4 text-white">Update Progress</h3>
             <form id="manualInputForm" class="space-y-4">
-                <input type="number" id="manualProgressValue" class="w-full p-3 bg-gray-700 rounded-lg border border-gray-600">
+                <input type="number" id="manualProgressValue" class="w-full p-3 bg-gray-700 rounded-lg border border-gray-600 text-white">
                 <div class="flex justify-end gap-2">
-                    <button type="button" onclick="closeModal('manualInputModal')" class="px-4 py-2 bg-gray-600 rounded">Cancel</button>
-                    <button type="submit" class="px-4 py-2 bg-indigo-600 rounded">Save</button>
+                    <button type="button" onclick="closeModal('manualInputModal')" class="px-4 py-2 bg-gray-600 rounded text-white">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-indigo-600 rounded text-white">Save</button>
                 </div>
             </form>
         </div>
@@ -220,10 +243,10 @@
         <div class="bg-gray-800 p-6 rounded-xl w-80">
             <h3 class="text-lg font-bold mb-4 text-purple-400">Update Pallets</h3>
             <form id="manualPalletForm" class="space-y-4">
-                <input type="number" id="manualPalletValue" class="w-full p-3 bg-gray-700 rounded-lg border border-gray-600" placeholder="Number of Pallets">
+                <input type="number" id="manualPalletValue" class="w-full p-3 bg-gray-700 rounded-lg border border-gray-600 text-white" placeholder="Number of Pallets">
                 <div class="flex justify-end gap-2">
-                    <button type="button" onclick="closeModal('manualPalletInputModal')" class="px-4 py-2 bg-gray-600 rounded">Cancel</button>
-                    <button type="submit" class="px-4 py-2 bg-purple-600 rounded">Save</button>
+                    <button type="button" onclick="closeModal('manualPalletInputModal')" class="px-4 py-2 bg-gray-600 rounded text-white">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-purple-600 rounded text-white">Save</button>
                 </div>
             </form>
         </div>
@@ -231,8 +254,8 @@
 
     <script type="module">
         // --- CONFIGURATION ---
-        // GANTI URL DI BAWAH INI DENGAN URL WEB APP ANDA
-        const API_URL = 'https://script.google.com/macros/s/AKfycbze6-oR_zOj7vjz6Ha8PBw55ImGmQZKMs8m26ig1FpPDH-38kgvZaVbGUS_oAN8_3Iw/exec'; 
+        const API_URL = 'https://script.google.com/macros/s/AKfycbxT_u_sOmyvHj653yG8S3_v_E081e_4l_4O2v3_H8r2_Xw1_c1_2_s2_0/exec'; 
+        // NOTE: PASTIKAN API_URL DI ATAS SUDAH BENAR SESUAI MILIK ANDA
         
         // --- STATE ---
         let projects = [];
@@ -252,8 +275,6 @@
 
         function loadData() {
             showLoading(true);
-            
-            // Tambahkan parameter waktu agar tidak cache
             const fetchUrl = `${API_URL}?action=read&t=${new Date().getTime()}`;
 
             fetch(fetchUrl)
@@ -263,7 +284,6 @@
                     projects = data.projects || [];
                     globalHistory = data.history || [];
                     
-                    // Sort Projects
                     projects.sort((a, b) => {
                         const getPrio = (p) => {
                             const done = p.hasPalletStage ? p.palletDone : p.packingDone;
@@ -296,7 +316,6 @@
         }
 
         function syncData() {
-            // Optimistic UI Update (No loading screen, just background sync)
             const notif = document.getElementById('notification-box');
             notif.textContent = "Saving...";
             notif.classList.remove('opacity-0', 'pointer-events-none', 'bg-red-500', 'bg-green-500');
@@ -309,7 +328,7 @@
 
             fetch(API_URL, {
                 method: 'POST',
-                mode: 'no-cors', // Penting untuk GAS Web App simple
+                mode: 'no-cors',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             })
@@ -333,8 +352,8 @@
         // --- APP LOGIC ---
 
         function initApp() {
+            startLiveClock(); // Clock is strictly DOM based now, safe to start immediately
             loadData();
-            startLiveClock();
             
             // Event Listeners
             document.getElementById('btnAddProject').onclick = () => openModal('addProjectModal');
@@ -344,16 +363,11 @@
             document.getElementById('confirmDeleteAllButton').onclick = handleDeleteAllConfirmed;
             document.getElementById('btnDownloadImage').onclick = downloadDashboard;
             
-            // Filter
-            const filterSelect = document.createElement('select'); // We'll render this dynamically later
-            
-            // Urgent Toggle Logic
             document.getElementById('projectUrgent').onchange = (e) => 
                 document.getElementById('urgent-options').classList.toggle('hidden', !e.target.checked);
             document.getElementById('editProjectUrgent').onchange = (e) => 
                 document.getElementById('edit-urgent-options').classList.toggle('hidden', !e.target.checked);
                 
-            // Edit Form
             document.getElementById('editProjectForm').onsubmit = handleEditSubmit;
         }
 
@@ -418,7 +432,6 @@
             const oldVal = p[`${stage}Done`];
             const newVal = oldVal + change;
 
-            // Validation
             if (newVal < 0) return showNotification('Cannot be less than 0', 'error');
             
             if (stage === 'rakit' && newVal > p.totalQuantity) return showNotification('Exceeds Total', 'error');
@@ -426,7 +439,6 @@
             if (stage === 'packing' && newVal > p.qcDone) return showNotification('Wait for QC', 'error');
             if (stage === 'pallet' && newVal > p.packingDone) return showNotification('Wait for Packing', 'error');
 
-            // Logic Pallet Decrement Check
             if (change < 0) {
                  const prevStage = stage === 'rakit' ? 'qc' : stage === 'qc' ? 'packing' : 'pallet';
                  if (stage !== 'pallet' && p[`${prevStage}Done`] > newVal) {
@@ -440,13 +452,9 @@
             renderApp();
         };
         
-        // Expose to window for HTML buttons
         window.handlePalletAction = (isInc) => {
             const p = projects.find(x => x.id === currentProjectId);
             if(!p) return;
-            
-            // Logic: 1 Pallet = 2 items (usually)
-            // But if total is odd, last pallet is 1 item.
             
             if (isInc) {
                 const remainingWrapped = p.packingDone - p.palletDone;
@@ -455,7 +463,6 @@
                 if (remainingWrapped >= needed) updateProgress('pallet', needed);
                 else showNotification('Not enough items wrapped', 'error');
             } else {
-                // Decrement
                 if (p.palletDone <= 0) return;
                 const toRemove = (p.totalQuantity % 2 !== 0 && p.palletDone === p.totalQuantity) ? 1 : 2;
                 updateProgress('pallet', -toRemove);
@@ -467,11 +474,10 @@
         function renderApp() {
             const grid = document.getElementById('main-grid-content');
             const empty = document.getElementById('empty-state');
-            const header = document.getElementById('dashboard-header');
+            const headerContainer = document.getElementById('dashboard-header-container');
             const list = document.getElementById('project-list-container');
             const details = document.getElementById('detailed-project-view');
 
-            // Filter logic
             const filtered = projects.filter(p => {
                 if(currentFilter === 'All') return true;
                 const status = getStatus(p).text;
@@ -480,26 +486,24 @@
 
             if (projects.length === 0) {
                 grid.classList.add('hidden');
-                header.classList.add('hidden');
+                headerContainer.classList.add('hidden');
                 empty.classList.remove('hidden');
                 return;
             }
 
             grid.classList.remove('hidden');
-            header.classList.remove('hidden');
+            headerContainer.classList.remove('hidden');
             empty.classList.add('hidden');
 
-            // Render Header Stats
-            renderHeader(projects);
+            renderHeaderStats(projects); // ONLY UPDATE NUMBERS
 
-            // Render List
             list.innerHTML = filtered.map(p => {
                 const s = getStatus(p);
                 const activeClass = p.id === currentProjectId ? 'ring-2 ring-indigo-500 border-indigo-500 bg-gray-700' : 'bg-gray-800 border-gray-700 hover:bg-gray-700';
                 return `
                     <div onclick="selectProject('${p.id}')" class="cursor-pointer p-4 rounded-xl border shadow-md transition ${activeClass}">
                         <div class="flex justify-between items-start">
-                            <h3 class="font-bold text-sm truncate w-32">${p.name}</h3>
+                            <h3 class="font-bold text-sm truncate w-32 text-gray-100">${p.name}</h3>
                             <span class="text-[10px] px-2 py-0.5 rounded-full ${s.bg} ${s.text}">${s.text}</span>
                         </div>
                         ${p.isUrgent ? '<span class="text-[10px] text-red-500 font-bold blinking-urgent">URGENT</span>' : ''}
@@ -514,7 +518,6 @@
                 `;
             }).join('');
 
-            // Render Details
             if (currentProjectId) {
                 const p = projects.find(x => x.id === currentProjectId);
                 if (p) {
@@ -531,37 +534,15 @@
             }
         }
 
-        function renderHeader(allProjs) {
+        function renderHeaderStats(allProjs) {
              const total = allProjs.reduce((a, b) => a + b.totalQuantity, 0);
              const done = allProjs.reduce((a, b) => a + (b.hasPalletStage ? b.palletDone : b.packingDone), 0);
              const eff = total ? ((done/total)*100).toFixed(1) : 0;
              
-             document.getElementById('dashboard-header').innerHTML = `
-                <div class="bg-gray-800 p-4 rounded-xl shadow-lg flex flex-wrap justify-between items-center border border-gray-700">
-                    <div class="flex items-center gap-4">
-                        <div class="text-sm">
-                            <span class="text-gray-400">Total Output:</span>
-                            <span class="text-xl font-bold text-white ml-1">${done.toLocaleString()}</span>
-                            <span class="text-gray-500 text-xs"> / ${total.toLocaleString()}</span>
-                        </div>
-                        <div class="h-8 w-px bg-gray-600"></div>
-                        <div class="text-sm">
-                            <span class="text-gray-400">Efficiency:</span>
-                            <span class="text-xl font-bold text-lime-400 ml-1">${eff}%</span>
-                        </div>
-                    </div>
-                    
-                    <div class="flex items-center mt-2 sm:mt-0">
-                        <select onchange="window.setFilter(this.value)" class="bg-gray-700 text-sm rounded border border-gray-600 p-1 focus:ring-indigo-500">
-                            <option value="All">All Status</option>
-                            <option value="In Progress">In Progress</option>
-                            <option value="Completed">Completed</option>
-                            <option value="Urgent">Urgent Only</option>
-                        </select>
-                        <div class="ml-4 text-xs text-indigo-300 font-mono" id="live-clock">--:--</div>
-                    </div>
-                </div>
-             `;
+             // UPDATE STATIC ELEMENTS instead of overwriting innerHTML
+             document.getElementById('header-total-output').textContent = done.toLocaleString();
+             document.getElementById('header-total-target').textContent = ' / ' + total.toLocaleString();
+             document.getElementById('header-efficiency').textContent = eff + '%';
         }
         
         window.setFilter = (val) => { currentFilter = val; renderApp(); };
@@ -585,7 +566,6 @@
                 </div>
             `;
             
-            // Countdown Logic
             if(countdownInterval) clearInterval(countdownInterval);
             if(p.isUrgent && p.targetDate) {
                  const target = new Date(`${p.targetDate}T${p.targetTime || '00:00'}`);
@@ -618,7 +598,7 @@
             
             if(p.hasPalletStage) {
                 labels.push('Palletizing');
-                data.push(p.palletDone); // Note: Chart shows raw items, Label formats to Pallets
+                data.push(p.palletDone); 
                 colors.push('#8b5cf6');
             }
 
@@ -656,30 +636,28 @@
                 const displayMax = isPallet ? Math.ceil(p.totalQuantity/2) : p.totalQuantity;
                 const unit = isPallet ? 'Plt' : 'Unit';
                 
-                const btnDec = isPallet 
-                    ? `onclick="handlePalletAction(false)"` 
-                    : `onclick="updateProgress('${id}', -1)"`;
-                const btnInc = isPallet 
-                    ? `onclick="handlePalletAction(true)"` 
-                    : `onclick="updateProgress('${id}', 1)"`;
-                
-                // Manual input handler setup
-                const openManual = isPallet 
-                    ? `openManualPallet()` 
-                    : `openManual('${id}', '${name}')`;
+                const btnDec = isPallet ? `onclick="handlePalletAction(false)"` : `onclick="updateProgress('${id}', -1)"`;
+                const btnInc = isPallet ? `onclick="handlePalletAction(true)"` : `onclick="updateProgress('${id}', 1)"`;
+                const openManual = isPallet ? `openManualPallet()` : `openManual('${id}', '${name}')`;
+
+                // Calculate Fill Percentage for the Shadow
+                const fillPercent = Math.min((val / p.totalQuantity) * 100, 100);
 
                 return `
-                <div class="progress-card bg-gray-700 p-4 rounded-xl border-t-4 border-${color}-500 flex flex-col justify-between h-32 relative group">
-                    <div class="flex justify-between items-start">
+                <div class="progress-card bg-gray-700 p-4 rounded-xl border-t-4 border-${color}-500 flex flex-col justify-between h-32 relative group overflow-hidden">
+                    
+                    <div class="absolute bottom-0 left-0 h-full bg-${color}-500 opacity-20 progress-fill pointer-events-none" style="width: ${fillPercent}%"></div>
+
+                    <div class="relative z-10 flex justify-between items-start">
                         <h4 class="text-sm text-${color}-400 font-bold uppercase">${name}</h4>
                         <button onclick="${openManual}" class="text-gray-500 hover:text-white opacity-0 group-hover:opacity-100 transition"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg></button>
                     </div>
-                    <div class="text-center my-1">
+                    <div class="relative z-10 text-center my-1">
                         <span class="text-3xl font-bold text-white">${displayVal}</span>
                         <span class="text-xs text-gray-400">/ ${displayMax} ${unit}</span>
                     </div>
-                    <div class="flex justify-center gap-4 mt-auto">
-                        <button ${btnDec} class="w-8 h-8 rounded-full bg-gray-600 hover:bg-red-500 text-white flex items-center justify-center transition shadow">-</button>
+                    <div class="relative z-10 flex justify-center gap-4 mt-auto">
+                        <button ${btnDec} class="w-8 h-8 rounded-full bg-gray-800 hover:bg-red-500 border border-gray-600 text-white flex items-center justify-center transition shadow">-</button>
                         <button ${btnInc} class="w-8 h-8 rounded-full bg-${color}-600 hover:bg-${color}-500 text-white flex items-center justify-center transition shadow">+</button>
                     </div>
                 </div>`;
@@ -722,21 +700,18 @@
             return { text: 'In Progress', color: 'blue', bg: 'bg-blue-900 text-blue-200' };
         }
 
+        // FIXED CLOCK FUNCTION
         function startLiveClock() {
-    setInterval(() => {
-        // Cek dulu apakah elemen 'live-clock' sudah muncul di layar?
-        const clockElement = document.getElementById('live-clock');
-        
-        // Jika elemen ada, baru kita update jamnya
-        if (clockElement) {
-            const now = new Date();
-            const time = now.toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit'});
-            const date = now.toLocaleDateString('en-US', {weekday:'short', day:'numeric', month:'short'});
-            clockElement.textContent = `${date} • ${time}`;
+            setInterval(() => {
+                const clockElement = document.getElementById('live-clock');
+                if (clockElement) {
+                    const now = new Date();
+                    const time = now.toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit'});
+                    const date = now.toLocaleDateString('en-US', {weekday:'short', day:'numeric', month:'short'});
+                    clockElement.textContent = `${date} • ${time}`;
+                }
+            }, 1000);
         }
-        // Jika elemen belum ada (masih loading), kode ini tidak akan melakukan apa-apa (tidak error)
-    }, 1000);
-}
 
         function showNotification(msg, type) {
             const box = document.getElementById('notification-box');
@@ -809,17 +784,14 @@
         window.openManualPallet = () => {
              const p = projects.find(x => x.id === currentProjectId);
              const input = document.getElementById('manualPalletValue');
-             input.value = Math.ceil(p.palletDone / 2); // Show Pallet Count
+             input.value = Math.ceil(p.palletDone / 2); 
              
              document.getElementById('manualPalletForm').onsubmit = (e) => {
                  e.preventDefault();
                  const newPalletCount = parseInt(input.value);
-                 // Convert Pallet Count to Items (Approx)
                  const newItems = newPalletCount * 2;
-                 // But cap at Total Qty
                  const finalItems = Math.min(newItems, p.totalQuantity);
                  
-                 // Update directly logic
                  const diff = finalItems - p.palletDone;
                  if(diff !== 0) updateProgress('pallet', diff);
                  closeModal('manualPalletInputModal');
