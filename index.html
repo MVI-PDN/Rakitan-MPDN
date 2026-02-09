@@ -723,13 +723,20 @@
         }
 
         function startLiveClock() {
-            setInterval(() => {
-                const now = new Date();
-                const time = now.toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit'});
-                const date = now.toLocaleDateString('en-US', {weekday:'short', day:'numeric', month:'short'});
-                document.getElementById('live-clock').textContent = `${date} • ${time}`;
-            }, 1000);
+    setInterval(() => {
+        // Cek dulu apakah elemen 'live-clock' sudah muncul di layar?
+        const clockElement = document.getElementById('live-clock');
+        
+        // Jika elemen ada, baru kita update jamnya
+        if (clockElement) {
+            const now = new Date();
+            const time = now.toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit'});
+            const date = now.toLocaleDateString('en-US', {weekday:'short', day:'numeric', month:'short'});
+            clockElement.textContent = `${date} • ${time}`;
         }
+        // Jika elemen belum ada (masih loading), kode ini tidak akan melakukan apa-apa (tidak error)
+    }, 1000);
+}
 
         function showNotification(msg, type) {
             const box = document.getElementById('notification-box');
