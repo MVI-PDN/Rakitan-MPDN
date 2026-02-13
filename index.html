@@ -128,7 +128,7 @@
             });
 
             // 2. Listen to History (Single doc for simplicity in this version)
-            // PERBAIKAN: Menambahkan 'summary' agar path memiliki 6 segmen (Genap)
+            // PERBAIKAN: Menambahkan 'summary' agar path memiliki 6 segmen (Genap) - Mencegah Error
             const historyDoc = doc(db, 'artifacts', appId, 'public', 'data', 'global_history', 'summary');
             onSnapshot(historyDoc, (docSnap) => {
                 if (docSnap.exists()) {
@@ -179,7 +179,7 @@
 
             // Sync to cloud
             try {
-                // PERBAIKAN: Menambahkan 'summary' agar path konsisten dan valid
+                // PERBAIKAN: Menambahkan 'summary' agar path konsisten dan valid (6 segmen)
                 const historyDoc = doc(db, 'artifacts', appId, 'public', 'data', 'global_history', 'summary');
                 await setDoc(historyDoc, { logs: globalHistory });
             } catch (e) {
