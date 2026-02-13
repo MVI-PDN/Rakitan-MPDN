@@ -3,275 +3,1247 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Production Assembly Management - Online Cloud</title>
+    <title>Production Assembly Management (Live)</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext x='50%25' y='50%25' dominant-baseline='central' text-anchor='middle' font-size='60' font-weight='bold' fill='%231E40AF' stroke='white' stroke-width='2' font-family='Lato, sans-serif'%3EMVI%3C/text%3E%3C/svg%3E">
+    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+    <!-- Chart.js Data Labels Plugin CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+    <!-- html2canvas CDN for screenshots -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <!-- Inter Font -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; }
         .text-indigo-400, .text-gray-400, .text-green-400, .text-yellow-400, .text-red-400, .text-red-500, .text-teal-400, .text-teal-300, .text-purple-400, .text-purple-300, .text-lime-400 {}
+        .border-blue-500, .border-green-500, .border-orange-500, .border-teal-500, .border-purple-500 {}
+        .bg-blue-600, .hover\:bg-blue-500, .bg-green-600, .hover\:bg-green-500, .bg-orange-600, .hover\:bg-orange-500, .bg-gray-600, .bg-red-600, .hover\:bg-red-500, .bg-red-500, .bg-yellow-500, .bg-teal-600, .hover\:bg-teal-500, .bg-purple-600, .hover\:bg-purple-500, .bg-green-500, .bg-blue-500, .bg-orange-500 {}
+        
         .progress-card { transition: transform 0.2s, box-shadow 0.2s; }
-        .progress-card:hover { transform: translateY(-3px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
+        .progress-card:hover { transform: translateY(-3px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); }
         .modal { transition: opacity 0.3s ease-in-out; }
-        @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(99, 102, 241, 0); } }
+        
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(99, 102, 241, 0); }
+        }
         .pulse-effect { animation: pulse 2s infinite; }
-        .blinking-urgent { animation: blink-urgent 1s ease-in-out infinite; }
+
         @keyframes blink-urgent { 50% { opacity: 0.3; } }
+        .blinking-urgent { animation: blink-urgent 1s ease-in-out infinite; }
+        
+        .chart-title-container { width: 100%; text-align: center; }
     </style>
 </head>
 <body class="bg-gray-900 min-h-screen text-gray-100">
 
-    <header class="bg-gray-800 border-b border-gray-700 sticky top-0 z-40 shadow-lg p-4">
-        <div class="max-w-7xl mx-auto flex justify-between items-center">
-            <div class="flex items-center space-x-3">
-                <div class="bg-blue-600 p-2 rounded-lg font-bold text-white">MVI</div>
-                <h1 class="text-xl font-bold bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">Assembly Pro Online</h1>
-            </div>
-            <div class="text-right">
-                <p id="current-date-header" class="text-xs text-gray-400"></p>
-                <p id="current-time-header" class="text-sm font-mono text-blue-400"></p>
-            </div>
-        </div>
-    </header>
+    <!-- Firebase Logic Script -->
+    <script type="module">
+        import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-    <main class="max-w-7xl mx-auto p-4 md:p-8">
-        <div id="dashboard-header" class="flex flex-col md:flex-row justify-between items-center gap-4 mb-8">
-            <div class="flex gap-2">
-                <button onclick="setFilter('All')" class="px-4 py-2 rounded-lg bg-gray-800 border border-gray-700 hover:bg-gray-700">All</button>
-                <button onclick="setFilter('Urgent')" class="px-4 py-2 rounded-lg bg-red-900/30 border border-red-800 text-red-400 hover:bg-red-800/40">Urgent</button>
-            </div>
-            <div class="flex gap-3">
-                <button onclick="openModal('addProjectModal')" class="bg-blue-600 hover:bg-blue-500 px-6 py-2 rounded-lg font-bold">+ New Assembly</button>
-            </div>
-        </div>
+        // --- KONFIGURASI FIREBASE ---
+        // Jika Anda hosting di GitHub Pages, Anda HARUS mengisi manualConfig ini dengan data dari Firebase Console Anda.
+        const manualConfig = {
+            apiKey: "",
+            authDomain: "",
+            projectId: "",
+            storageBucket: "",
+            messagingSenderId: "",
+            appId: ""
+        };
 
-        <div id="main-grid-content" class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div id="project-list-container" class="lg:col-span-1 space-y-4 max-h-[70vh] overflow-y-auto pr-2 custom-scrollbar">
-                </div>
+        let db, auth, user;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-assembly-app';
+        
+        // --- State Management ---
+        let projects = [];
+        let globalHistory = [];
+        let currentProjectId = null;
+        let chartInstance = null;
+        let currentFilter = 'All';
+        let countdownInterval = null;
+
+        // --- Inisialisasi Firebase ---
+        async function initFirebase() {
+            try {
+                const configToUse = (typeof __firebase_config !== 'undefined' && __firebase_config) 
+                    ? JSON.parse(__firebase_config) 
+                    : (manualConfig.apiKey ? manualConfig : null);
+
+                if (configToUse) {
+                    const app = !getApps().length ? initializeApp(configToUse) : getApp();
+                    auth = getAuth(app);
+                    db = getFirestore(app);
+
+                    // Login Logic
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                         await signInWithCustomToken(auth, __initial_auth_token);
+                    } else {
+                         await signInAnonymously(auth);
+                    }
+
+                    onAuthStateChanged(auth, (u) => {
+                        if (u) {
+                            user = u;
+                            console.log("Connected to Firebase as:", user.uid);
+                            setupRealtimeListeners();
+                        }
+                    });
+                } else {
+                    console.error("Firebase config missing");
+                    showNotification("Firebase config missing. Live sync inactive.", "error");
+                }
+            } catch (e) {
+                console.error("Firebase Init Error", e);
+                showNotification("Error connecting to cloud.", "error");
+            }
+        }
+
+        // --- Real-time Listeners ---
+        function setupRealtimeListeners() {
+            if (!db) return;
+
+            // 1. Listen to Assemblies
+            // Path: artifacts/{appId}/public/data/assemblies
+            const assembliesCol = collection(db, 'artifacts', appId, 'public', 'data', 'assemblies');
             
-            <div id="detailed-project-view" class="lg:col-span-2 space-y-6">
-                <div id="assembly-details-container" class="bg-gray-800 p-6 rounded-2xl border border-gray-700 shadow-xl min-h-[400px]">
-                    <p class="text-gray-500 text-center mt-20 italic">Select an assembly to view details and update progress</p>
+            onSnapshot(assembliesCol, (snapshot) => {
+                const newProjects = [];
+                snapshot.forEach(doc => {
+                    newProjects.push({ ...doc.data(), id: doc.id });
+                });
+                
+                // Keep UI sorting logic
+                projects = newProjects;
+                sortProjects();
+                
+                // Refresh UI
+                renderAllProjectsDashboard();
+            }, (error) => {
+                console.error("Error reading assemblies:", error);
+            });
+
+            // 2. Listen to History (Single doc for simplicity in this version)
+            // PERBAIKAN: Menambahkan 'summary' agar path memiliki 6 segmen (Genap)
+            const historyDoc = doc(db, 'artifacts', appId, 'public', 'data', 'global_history', 'summary');
+            onSnapshot(historyDoc, (docSnap) => {
+                if (docSnap.exists()) {
+                    globalHistory = docSnap.data().logs || [];
+                } else {
+                    globalHistory = [];
+                }
+                renderGlobalHistory();
+            });
+        }
+
+        // --- Data Helpers (Replaces localStorage) ---
+        
+        async function saveProjectToCloud(project) {
+            if (!db) return;
+            try {
+                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'assemblies', project.id);
+                await setDoc(docRef, project);
+            } catch (e) {
+                console.error("Save failed", e);
+                showNotification("Failed to save to cloud", "error");
+            }
+        }
+
+        async function deleteProjectFromCloud(projectId) {
+            if (!db) return;
+            try {
+                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'assemblies', projectId));
+            } catch (e) {
+                console.error("Delete failed", e);
+            }
+        }
+
+        async function addHistoryLog(type, message, details = {}) {
+            const newLog = {
+                type: type,
+                message: message,
+                timestamp: new Date().toISOString(),
+                ...details
+            };
+            
+            // Optimistic update for UI speed
+            globalHistory.unshift(newLog);
+            if (globalHistory.length > 200) globalHistory.pop();
+            renderGlobalHistory();
+
+            if (!db) return;
+
+            // Sync to cloud
+            try {
+                // PERBAIKAN: Menambahkan 'summary' agar path konsisten dan valid
+                const historyDoc = doc(db, 'artifacts', appId, 'public', 'data', 'global_history', 'summary');
+                await setDoc(historyDoc, { logs: globalHistory });
+            } catch (e) {
+                console.error("History log failed", e);
+            }
+        }
+
+        // --- Utility Functions ---
+        function getFormattedDateTime(timestamp = null) {
+            const dateObj = timestamp ? new Date(timestamp) : new Date();
+            const optionsDate = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            const optionsTime = { hour: '2-digit', minute: '2-digit', hour12: true }; 
+            const datePart = dateObj.toLocaleDateString('en-US', optionsDate);
+            const timePart = dateObj.toLocaleTimeString('en-US', optionsTime);
+            return { date: datePart, time: timePart };
+        }
+        
+        function startLiveClock() {
+            setInterval(() => {
+                const now = new Date();
+                const timeElement = document.getElementById('current-time-header');
+                const dateElement = document.getElementById('current-date-header');
+                const { date, time } = getFormattedDateTime(now);
+                if (timeElement) timeElement.textContent = time;
+                if (dateElement && dateElement.textContent !== date) {
+                     dateElement.textContent = date;
+                     renderAllProjectsDashboard(); 
+                }
+            }, 1000); 
+        }
+
+        function sortProjects() {
+            projects.sort((a, b) => {
+                const aStatus = getProjectStatus(a);
+                const bStatus = getProjectStatus(b);
+                const aIsCompleted = aStatus.status === 'Completed';
+                const bIsCompleted = bStatus.status === 'Completed';
+
+                const getPriority = (project, isCompleted) => {
+                    if (project.isUrgent) return isCompleted ? 2 : 1;
+                    return isCompleted ? 3 : 4;
+                };
+
+                const aPriority = getPriority(a, aIsCompleted);
+                const bPriority = getPriority(b, bIsCompleted);
+
+                if (aPriority !== bPriority) return aPriority - bPriority;
+                return new Date(a.createdAt) - new Date(b.createdAt);
+            });
+        }
+
+        // --- App Actions ---
+
+        window.addProject = async (name, totalQuantity, isUrgent, hasPalletStage, targetDate, targetTime) => {
+            if (!name || isNaN(totalQuantity) || totalQuantity <= 0) {
+                showNotification('Nama Rakitan dan Jumlah Total harus diisi dengan benar.', 'error');
+                return;
+            }
+
+            const newProject = {
+                id: 'proj_' + Date.now(),
+                name: name,
+                totalQuantity: totalQuantity,
+                isUrgent: isUrgent,
+                hasPalletStage: hasPalletStage,
+                targetDate: targetDate || null,
+                targetTime: targetTime || null,
+                rakitDone: 0,
+                qcDone: 0,
+                packingDone: 0,
+                palletDone: 0,
+                createdAt: new Date().toISOString(),
+            };
+            
+            // Firebase Write
+            await saveProjectToCloud(newProject);
+            await addHistoryLog('CREATE', `Assembly "${name}" has been created.`);
+            
+            currentProjectId = newProject.id;
+            showNotification(`Assembly '${name}' successfully added!`, 'success');
+            closeModal('addProjectModal');
+        }
+
+        window.deleteProjectConfirmed = async (projectId, projectName) => {
+            await addHistoryLog('DELETE', `Assembly "${projectName}" has been deleted.`);
+            await deleteProjectFromCloud(projectId);
+            
+            if (currentProjectId === projectId) currentProjectId = null;
+            closeModal('deleteConfirmModal');
+            showNotification(`Assembly '${projectName}' successfully deleted.`, 'success');
+        }
+
+        window.resetProjectProgressConfirmed = async (projectId, projectName) => {
+            const project = projects.find(p => p.id === projectId);
+            if (project) {
+                project.rakitDone = 0;
+                project.qcDone = 0;
+                project.packingDone = 0;
+                project.palletDone = 0;
+
+                await addHistoryLog('RESET', `Progress for assembly "${projectName}" has been reset.`);
+                await saveProjectToCloud(project);
+
+                closeModal('resetConfirmModal');
+                showNotification(`Progress for '${projectName}' has been reset successfully!`, 'success');
+            }
+        }
+
+        window.updateProjectDetails = async (projectId, name, totalQuantity, isUrgent, hasPalletStage, targetDate, targetTime) => {
+             if (!projectId || !name || isNaN(totalQuantity) || totalQuantity <= 0) {
+                 showNotification('Invalid input.', 'error');
+                 return;
+             }
+            const project = projects.find(p => p.id === projectId);
+            if (project) {
+                project.name = name;
+                project.totalQuantity = totalQuantity;
+                project.isUrgent = isUrgent;
+                project.hasPalletStage = hasPalletStage;
+                project.targetDate = isUrgent ? (targetDate || null) : null;
+                project.targetTime = isUrgent ? (targetTime || null) : null;
+                
+                await addHistoryLog('EDIT', `Details for assembly "${name}" have been updated.`);
+                await saveProjectToCloud(project);
+
+                closeModal('editProjectModal');
+                showNotification(`Assembly details for '${name}' updated!`, 'success');
+            }
+        }
+
+        function getValidationMessage(project, stage, newValue) {
+            const oldValue = project[`${stage}Done`];
+            if (newValue < 0) return `${stage.toUpperCase()} cannot be less than 0.`;
+            if (stage === 'rakit' && newValue > project.totalQuantity) return `Assembly cannot exceed Total (${project.totalQuantity}).`;
+            if (stage === 'qc' && newValue > project.rakitDone) return `QC cannot exceed Assembly (${project.rakitDone}).`;
+            if (stage === 'packing' && newValue > project.qcDone) return `${project.hasPalletStage ? 'Wrapping' : 'Packing'} cannot exceed QC (${project.qcDone}).`;
+            if (project.hasPalletStage && stage === 'pallet' && newValue > project.packingDone) return `Pallet cannot exceed Wrapping (${project.packingDone}).`;
+            
+            if (newValue < oldValue) {
+                if (stage === 'rakit' && project.qcDone > newValue) return `Assembly cannot be reduced below QC count.`;
+                if (stage === 'qc' && project.packingDone > newValue) return `QC cannot be reduced below Packing count.`;
+                if (project.hasPalletStage && stage === 'packing' && project.palletDone > newValue) return `Wrapping cannot be reduced below Pallet count.`;
+            }
+            return null;
+        }
+
+        async function updateProgress(stage, quantityChange) {
+            if (!currentProjectId || quantityChange === 0) return;
+            
+            const project = projects.find(p => p.id === currentProjectId);
+            if (!project) return;
+
+            const oldValue = project[`${stage}Done`];
+            const newValue = oldValue + quantityChange;
+            const validationError = getValidationMessage(project, stage, newValue);
+
+            if (validationError) {
+                showNotification(validationError, 'warning');
+                return;
+            }
+            
+            project[`${stage}Done`] = newValue;
+            const actionText = quantityChange > 0 ? 'increased' : 'decreased';
+            
+            // Optimistic update
+            renderAllProjectsDashboard();
+            
+            await addHistoryLog('PROGRESS', `${stage.toUpperCase()} for "${project.name}" ${actionText} to ${newValue}.`, { stage: stage });
+            await saveProjectToCloud(project);
+        }
+
+        // --- Export/Import (Offline features adapted) ---
+        // Note: Import in a live DB context is dangerous (overwrites). 
+        // We will keep Export for backup, but Import will act as "Local Overwrite" or we can disable it.
+        // For now, I'll keep the logic but it will overwrite the Cloud data if used.
+        
+        window.exportData = () => {
+            const dataToExport = { projects, globalHistory };
+            const dataStr = JSON.stringify(dataToExport, null, 2);
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(dataBlob);
+            link.download = `assembly_backup_${new Date().toISOString().slice(0, 10)}.json`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        window.triggerImport = () => document.getElementById('import-file-input').click();
+
+        window.importData = (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const importedData = JSON.parse(e.target.result);
+                    if (importedData.projects) {
+                        document.getElementById('confirmImportButton').onclick = async () => {
+                            // Dangerous: Overwrites cloud data
+                            showNotification("Importing data to cloud...", "warning");
+                            
+                            // Delete existing (simplistic approach)
+                            for(let p of projects) await deleteProjectFromCloud(p.id);
+                            
+                            // Add new
+                            for(let p of importedData.projects) await saveProjectToCloud(p);
+                            
+                            if(importedData.globalHistory) {
+                                globalHistory = importedData.globalHistory;
+                                // PERBAIKAN: Menambahkan 'summary' pada path history saat import
+                                const historyDoc = doc(db, 'artifacts', appId, 'public', 'data', 'global_history', 'summary');
+                                await setDoc(historyDoc, { logs: globalHistory });
+                            }
+
+                            closeModal('importConfirmModal');
+                            showNotification('Data successfully imported to Cloud!', 'success');
+                        };
+                        openModal('importConfirmModal');
+                    }
+                } catch (error) {
+                    showNotification('Failed to read file.', 'error');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        window.downloadDashboardAsImage = async () => {
+            try {
+                const canvas = await html2canvas(document.body, { backgroundColor: '#111827' });
+                const link = document.createElement('a');
+                link.href = canvas.toDataURL('image/png');
+                link.download = 'dashboard-assembly.png';
+                link.click();
+            } catch (error) {
+                console.error(error);
+                showNotification('Error downloading image.', 'error');
+            }
+        }
+
+        // --- UI Rendering ---
+        function showNotification(message, type = 'info') {
+            const notification = document.getElementById('notification-box');
+            notification.textContent = message;
+            let bgColor = 'bg-blue-500';
+            if (type === 'success') bgColor = 'bg-green-500';
+            if (type === 'error') bgColor = 'bg-red-500';
+            if (type === 'warning') bgColor = 'bg-yellow-500';
+
+            notification.className = `fixed top-4 right-4 p-4 rounded-lg text-white shadow-xl z-50 transition-all duration-300 ${bgColor}`;
+            notification.classList.remove('opacity-0', 'pointer-events-none');
+            notification.classList.add('opacity-100');
+
+            setTimeout(() => {
+                notification.classList.remove('opacity-100');
+                notification.classList.add('opacity-0', 'pointer-events-none');
+            }, 3000);
+        }
+
+        window.openModal = (modalId) => {
+            if (modalId === 'addProjectModal') {
+                document.getElementById('projectForm').reset();
+                document.getElementById('urgent-options').classList.add('hidden');
+            }
+            const modal = document.getElementById(modalId);
+            if(modal) modal.classList.remove('opacity-0', 'pointer-events-none');
+        }
+
+        window.closeModal = (modalId) => {
+            const modal = document.getElementById(modalId);
+            if(modal) modal.classList.add('opacity-0', 'pointer-events-none');
+        }
+
+        window.clearAllHistory = async () => {
+            globalHistory = [];
+            // PERBAIKAN: Menambahkan 'summary' pada path history saat clear
+            const historyDoc = doc(db, 'artifacts', appId, 'public', 'data', 'global_history', 'summary');
+            if(db) await setDoc(historyDoc, { logs: [] });
+            
+            closeModal('clearHistoryConfirmModal');
+            showNotification('History cleared.', 'success');
+            renderGlobalHistory();
+        }
+
+        window.deleteAllProjectsConfirmed = async () => {
+            await addHistoryLog('DELETE', `All assemblies have been deleted.`);
+            for(let p of projects) {
+                await deleteProjectFromCloud(p.id);
+            }
+            currentProjectId = null;
+            closeModal('deleteAllConfirmModal');
+            showNotification('All assemblies deleted.', 'success');
+        }
+
+        // Modals Handlers
+        window.openDeleteAllConfirmModal = () => projects.length === 0 ? showNotification('No assemblies to delete.', 'info') : openModal('deleteAllConfirmModal');
+        window.openClearHistoryConfirmModal = () => globalHistory.length === 0 ? showNotification('No history.', 'info') : openModal('clearHistoryConfirmModal');
+        
+        window.openEditModal = () => {
+            const project = projects.find(p => p.id === currentProjectId);
+            if (!project) return;
+            document.getElementById('editProjectName').value = project.name;
+            document.getElementById('editProjectQuantity').value = project.totalQuantity;
+            document.getElementById('editProjectHasPallet').checked = project.hasPalletStage || false;
+            document.getElementById('editProjectUrgent').checked = project.isUrgent || false;
+            document.getElementById('edit-urgent-options').classList.toggle('hidden', !project.isUrgent);
+            document.getElementById('editProjectTargetDate').value = project.targetDate || '';
+            document.getElementById('editProjectTargetTime').value = project.targetTime || '';
+
+            document.getElementById('editProjectForm').onsubmit = (event) => {
+                event.preventDefault();
+                updateProjectDetails(
+                    project.id,
+                    document.getElementById('editProjectName').value.trim(),
+                    parseInt(document.getElementById('editProjectQuantity').value),
+                    document.getElementById('editProjectUrgent').checked,
+                    document.getElementById('editProjectHasPallet').checked,
+                    document.getElementById('editProjectTargetDate').value,
+                    document.getElementById('editProjectTargetTime').value
+                );
+            };
+            openModal('editProjectModal');
+        };
+
+        window.openDeleteConfirmModal = () => {
+            const project = projects.find(p => p.id === currentProjectId);
+            if (!project) return;
+            document.getElementById('deleteConfirmText').textContent = `Delete "${project.name}"?`;
+            document.getElementById('confirmDeleteButton').onclick = () => deleteProjectConfirmed(project.id, project.name);
+            openModal('deleteConfirmModal');
+        };
+
+        window.openResetConfirmModal = () => {
+            const project = projects.find(p => p.id === currentProjectId);
+            if (!project) return;
+            document.getElementById('resetConfirmText').textContent = `Reset progress for "${project.name}"?`;
+            document.getElementById('confirmResetButton').onclick = () => resetProjectProgressConfirmed(project.id, project.name);
+            openModal('resetConfirmModal');
+        };
+
+        window.openManualInputModal = (stageId, stageName) => {
+            const project = projects.find(p => p.id === currentProjectId);
+            if (!project) return;
+            
+            if (stageId === 'pallet') {
+                const modalTitle = document.getElementById('manualPalletModalTitle');
+                modalTitle.textContent = `Update ${stageName} Count`;
+                const currentPallets = Math.ceil(project.palletDone / 2);
+                document.getElementById('manualPalletValue').value = currentPallets;
+                document.getElementById('manualPalletForm').onsubmit = (e) => window.handleManualPalletUpdate(e);
+                openModal('manualPalletInputModal');
+            } else {
+                const modalTitle = document.getElementById('manualInputModalTitle');
+                modalTitle.textContent = `Update ${stageName}`;
+                document.getElementById('manualProgressValue').value = project[`${stageId}Done`];
+                document.getElementById('manualInputForm').onsubmit = (e) => window.handleManualProgressUpdate(e, stageId);
+                openModal('manualInputModal');
+            }
+        };
+
+        window.handleManualProgressUpdate = async (event, stage) => {
+            event.preventDefault();
+            const newValue = parseInt(document.getElementById('manualProgressValue').value);
+            if (isNaN(newValue)) return;
+
+            const project = projects.find(p => p.id === currentProjectId);
+            if (!project) return;
+
+            const validationError = getValidationMessage(project, stage, newValue);
+            if (validationError) {
+                showNotification(validationError, 'warning');
+                return;
+            }
+
+            const oldValue = project[`${stage}Done`];
+            project[`${stage}Done`] = newValue;
+            
+            await addHistoryLog('PROGRESS', `${stage.toUpperCase()} manually set to ${newValue}.`, { stage });
+            await saveProjectToCloud(project);
+            
+            closeModal('manualInputModal');
+        }
+
+        window.handleProgressIncrement = (stage) => updateProgress(stage, 1);
+        
+        window.handleProgressDecrement = (stage) => {
+            const project = projects.find(p => p.id === currentProjectId);
+            if (!project || project[`${stage}Done`] <= 0) return;
+            updateProgress(stage, -1);
+        }
+
+        window.handleAddProjectSubmit = (event) => {
+            event.preventDefault();
+            window.addProject(
+                document.getElementById('projectName').value.trim(),
+                parseInt(document.getElementById('projectQuantity').value),
+                document.getElementById('projectUrgent').checked,
+                document.getElementById('projectHasPallet').checked,
+                document.getElementById('projectTargetDate').value,
+                document.getElementById('projectTargetTime').value
+            );
+        }
+
+        // Pallet Logic
+        window.handlePalletIncrement = () => {
+            const project = projects.find(p => p.id === currentProjectId);
+            if (!project) return;
+            const unpalletizedWrappedItems = project.packingDone - project.palletDone;
+            let itemsNeeded = 2;
+            if (project.totalQuantity % 2 !== 0 && (project.palletDone + 1 === project.totalQuantity)) itemsNeeded = 1;
+
+            if (unpalletizedWrappedItems >= itemsNeeded) updateProgress('pallet', itemsNeeded);
+            else showNotification('Not enough Wrapped units.', 'warning');
+        }
+
+        window.handlePalletDecrement = () => {
+            const project = projects.find(p => p.id === currentProjectId);
+            if (!project || project.palletDone <= 0) return;
+            let itemsInLastPallet = 2;
+            if (project.totalQuantity % 2 !== 0 && project.palletDone === project.totalQuantity) itemsInLastPallet = 1;
+            else if (project.palletDone > 0 && (project.palletDone - 2 < 0)) itemsInLastPallet = 1;
+            updateProgress('pallet', -itemsInLastPallet);
+        }
+
+        window.handleManualPalletUpdate = async (event) => {
+            event.preventDefault();
+            const newPalletCount = parseInt(document.getElementById('manualPalletValue').value);
+            if (isNaN(newPalletCount) || newPalletCount < 0) return;
+            
+            const project = projects.find(p => p.id === currentProjectId);
+            if (!project) return;
+            
+            let newItemCount = 0;
+            if (newPalletCount > 0) {
+                const isOddTotal = project.totalQuantity % 2 !== 0;
+                const maxPallets = Math.ceil(project.totalQuantity / 2);
+                if (newPalletCount >= maxPallets && isOddTotal) newItemCount = project.totalQuantity;
+                else newItemCount = newPalletCount * 2;
+            }
+            newItemCount = Math.min(newItemCount, project.totalQuantity);
+            
+            const validationError = getValidationMessage(project, 'pallet', newItemCount);
+            if (validationError) {
+                showNotification(validationError, 'warning');
+                return;
+            }
+
+            project.palletDone = newItemCount;
+            await addHistoryLog('PROGRESS', `PALLET set to ${newPalletCount} pallets.`, { stage: 'pallet' });
+            await saveProjectToCloud(project);
+            closeModal('manualPalletInputModal');
+        }
+
+        function getProjectStatus(project) {
+            if (!project || typeof project.totalQuantity === 'undefined') return { status: 'Invalid', color: 'red', progress: 0 };
+            const finalStageDone = project.hasPalletStage ? project.palletDone : project.packingDone;
+            const progress = project.totalQuantity > 0 ? (finalStageDone / project.totalQuantity) * 100 : 0;
+            let status = 'In Progress';
+            let color = 'indigo';
+            
+            if (project.rakitDone === 0) { status = 'Not Started'; color = 'gray'; }
+            else if (finalStageDone === project.totalQuantity && project.totalQuantity > 0) { status = 'Completed'; color = 'green'; }
+            else if (progress > 75) { status = 'Almost Complete'; color = 'yellow'; }
+            
+            return { status, color, progress: progress.toFixed(0) };
+        }
+        
+        window.setFilter = (filterValue) => {
+            currentFilter = filterValue;
+            renderAllProjectsDashboard();
+        };
+
+        function renderDashboardHeader() {
+            const headerContainer = document.getElementById('dashboard-header');
+            if (!headerContainer) return;
+            headerContainer.classList.remove('hidden');
+            const { date, time } = getFormattedDateTime(new Date());
+            
+            headerContainer.innerHTML = `
+                <div class="bg-gray-800 p-4 rounded-xl shadow-lg flex flex-col sm:flex-row justify-between items-center gap-4">
+                    <div class="flex items-center gap-4">
+                        <h2 class="text-xl font-bold text-gray-100 whitespace-nowrap">Current Assemblies</h2>
+                        <div class="flex items-center">
+                            <label for="status-filter" class="text-xs font-medium text-gray-400 mr-2">Status:</label>
+                            <select id="status-filter" class="bg-gray-700 text-gray-200 border border-gray-600 rounded-lg p-1 text-sm focus:ring-indigo-500 focus:border-indigo-500">
+                                <option value="All" ${currentFilter === 'All' ? 'selected' : ''}>All</option>
+                                <option value="Completed" ${currentFilter === 'Completed' ? 'selected' : ''}>Completed</option>
+                                <option value="In Progress" ${currentFilter === 'In Progress' ? 'selected' : ''}>In Progress</option>
+                                <option value="Almost Complete" ${currentFilter === 'Almost Complete' ? 'selected' : ''}>Almost Complete</option>
+                                <option value="Not Started" ${currentFilter === 'Not Started' ? 'selected' : ''}>Not Started</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="text-sm font-semibold text-gray-300 flex flex-wrap items-center justify-center sm:justify-end gap-x-4 gap-y-2">
+                        <div class="flex items-center">
+                            <svg class="h-5 w-5 mr-2 text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+                            <span>Live Cloud</span>
+                        </div>
+                        <div class="flex items-center">
+                            <svg class="h-5 w-5 mr-2 text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="18" x="3" y="4" rx="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
+                            <span id="current-date-header">${date}</span>
+                        </div>
+                        <div class="flex items-center">
+                            <svg class="h-5 w-5 mr-2 text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                            <span id="current-time-header">${time}</span>
+                        </div>
+                    </div>
                 </div>
-                <div class="bg-gray-800 p-6 rounded-2xl border border-gray-700 shadow-xl h-96">
-                    <canvas id="productionChart"></canvas>
+            `;
+            headerContainer.querySelector('#status-filter').onchange = (e) => window.setFilter(e.target.value);
+        }
+
+        function renderAllProjectsDashboard() {
+            if (countdownInterval) clearInterval(countdownInterval);
+            const listContainer = document.getElementById('project-list-container');
+            const detailedView = document.getElementById('detailed-project-view');
+            const gridContainer = document.getElementById('main-grid-content');
+            const userInfo = document.getElementById('user-info');
+            const headerContainer = document.getElementById('dashboard-header');
+
+            renderDashboardHeader();
+
+            if (projects.length === 0) {
+                // Keep header visible so we see clock
+                if (gridContainer) gridContainer.classList.add('hidden'); 
+                if (userInfo) userInfo.classList.remove('hidden');
+                listContainer.innerHTML = '';
+                detailedView.classList.add('hidden');
+                return;
+            }
+
+            if (gridContainer) gridContainer.classList.remove('hidden');
+            if (userInfo) userInfo.classList.add('hidden');
+            
+            const filteredProjects = projects.filter(project => {
+                const { status } = getProjectStatus(project);
+                if (currentFilter === 'All') return true;
+                return status === currentFilter;
+            });
+            
+            const totalTarget = projects.reduce((sum, p) => sum + (p.totalQuantity || 0), 0);
+            const totalCompleted = projects.reduce((sum, p) => sum + (p.hasPalletStage ? p.palletDone : p.packingDone || 0), 0);
+            const overallEfficiency = totalTarget > 0 ? ((totalCompleted / totalTarget) * 100).toFixed(1) : 0;
+            
+            const globalSummaryCard = `
+                <div class="bg-gray-800 p-3 rounded-xl shadow-lg border-l-4 border-indigo-600 mb-4">
+                    <h3 class="text-sm font-bold text-indigo-400 mb-2 flex items-center">Global Summary</h3>
+                    <div class="space-y-1 text-xs">
+                        <div class="flex justify-between text-gray-300">
+                            <span class="font-medium">Total Target:</span>
+                            <span class="font-extrabold text-indigo-300">${totalTarget.toLocaleString('en-US')}</span>
+                        </div>
+                        <div class="flex justify-between text-gray-300">
+                            <span class="font-medium">Total Completed:</span>
+                            <span class="font-extrabold text-green-300">${totalCompleted.toLocaleString('en-US')}</span>
+                        </div>
+                        <div class="flex justify-between pt-1 border-t border-gray-700 mt-1">
+                            <span class="font-bold">Overall Efficiency:</span>
+                            <span class="font-extrabold text-lg text-yellow-400">${overallEfficiency}%</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            let topContent = globalSummaryCard;
+            if (filteredProjects.length === 0 && currentFilter !== 'All') {
+                topContent += `<div class="bg-gray-800 p-6 rounded-xl text-center text-gray-400 shadow-lg mt-4">No assemblies found with status: ${currentFilter}.</div>`;
+            } else {
+                topContent += '<div class="grid grid-cols-1 space-y-3 max-h-[39rem] overflow-y-auto pr-2">';
+                filteredProjects.forEach(project => {
+                    const { status, color, progress } = getProjectStatus(project);
+                    const isSelected = project.id === currentProjectId ? 'ring-2 ring-indigo-500 border-indigo-500' : 'border-gray-700';
+                    const urgentTag = project.isUrgent ? `<span class="blinking-urgent text-xs font-bold py-0.5 px-2 rounded-full bg-red-500 text-white ml-2">URGENT</span>` : '';
+                    
+                    let targetDeadlineHTML = '';
+                    if (project.isUrgent && project.targetDate) {
+                        const targetDateTimeStr = `${project.targetDate}T${project.targetTime || '00:00:00'}`;
+                        const targetDateTime = new Date(targetDateTimeStr);
+                        if (!isNaN(targetDateTime)) {
+                            const isOverdue = new Date() > targetDateTime;
+                            const textColor = isOverdue ? 'text-red-400 font-bold' : 'text-yellow-400';
+                            targetDeadlineHTML = `
+                                <div class="text-[11px] font-semibold ${textColor} mt-1 flex items-center gap-1">
+                                    <svg class="h-3 w-3" fill="currentColor" viewBox="0 0 20 20"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.414-1.415L11 9.586V6z"/></svg>
+                                    Target: ${targetDateTime.toLocaleDateString('en-GB')} ${project.targetTime || ''}
+                                </div>`;
+                        }
+                    }
+
+                    const rakitPercent = (project.totalQuantity > 0) ? (project.rakitDone / project.totalQuantity) * 100 : 0;
+                    const qcPercent = (project.totalQuantity > 0) ? (project.qcDone / project.totalQuantity) * 100 : 0;
+                    const packingPercent = (project.totalQuantity > 0) ? (project.packingDone / project.totalQuantity) * 100 : 0;
+                    const palletPercent = project.hasPalletStage ? ((project.totalQuantity > 0) ? (project.palletDone / project.totalQuantity) * 100 : 0) : 0;
+                    
+                    const palletBarWidth = palletPercent;
+                    const packingBarWidth = Math.max(0, packingPercent - palletBarWidth);
+                    const qcBarWidth = Math.max(0, qcPercent - packingPercent);
+                    const rakitBarWidth = Math.max(0, rakitPercent - qcPercent);
+
+                    topContent += `
+                        <div onclick="window.selectProject('${project.id}')" class="bg-gray-800 p-3 rounded-lg shadow-md border-2 ${isSelected} cursor-pointer hover:shadow-xl transition duration-300 transform hover:scale-[1.01] flex flex-col">
+                            <div class="flex justify-between items-start mb-1">
+                                <div class="flex items-center truncate">
+                                    <h3 class="text-sm font-bold text-gray-100 truncate">${project.name}</h3>
+                                    ${urgentTag}
+                                </div>
+                                <div class="flex-shrink-0 ml-2">
+                                    <span class="text-[10px] font-semibold py-0.5 px-2 rounded-full bg-${color}-900/50 text-${color}-300">${status.toUpperCase()}</span>
+                                </div>
+                            </div>
+                            ${targetDeadlineHTML}
+                            <div class="w-full mt-1">
+                                <div class="flex justify-between text-[10px] font-semibold mb-0.5 text-gray-400">
+                                    <div>Target: ${project.totalQuantity.toLocaleString('en-US')}</div>
+                                    <div>${progress}% Done</div>
+                                </div>
+                                <div class="w-full bg-gray-700 rounded-full h-1.5 flex overflow-hidden shadow-inner">
+                                    ${project.hasPalletStage ? `<div class="bg-purple-500 h-full" style="width: ${palletBarWidth}%;"></div>` : ''}
+                                    <div class="bg-orange-500 h-full" style="width: ${packingBarWidth}%;"></div>
+                                    <div class="bg-green-500 h-full" style="width: ${qcBarWidth}%;"></div>
+                                    <div class="bg-blue-500 h-full" style="width: ${rakitBarWidth}%;"></div>
+                                    <div class="bg-gray-600 h-full flex-grow"></div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                topContent += '</div>';
+            }
+            
+            listContainer.innerHTML = `<div>${topContent}</div>`; 
+            
+            if (currentProjectId && projects.find(p => p.id === currentProjectId)) {
+                detailedView.classList.remove('hidden');
+                renderDashboard(projects.find(p => p.id === currentProjectId));
+                renderGlobalHistory();
+            } else {
+                detailedView.classList.add('hidden');
+            }
+        }
+
+        window.selectProject = (projectId) => {
+            currentProjectId = projectId;
+            renderAllProjectsDashboard();
+        }
+
+        function renderDashboard(project) {
+            const urgentTag = project.isUrgent ? `<span class="blinking-urgent text-sm font-bold py-1 px-3 rounded-full bg-red-500 text-white ml-3">URGENT</span>` : '';
+            const detailsContainer = document.getElementById('assembly-details-container');
+
+            detailsContainer.innerHTML = `
+                <h2 class="text-lg font-bold text-gray-100 mb-1" id="project-name-display">
+                    <div class="flex items-center justify-between w-full">
+                        <span class="flex items-center flex-wrap">
+                            Assembly Details: <span class="ml-1 font-extrabold text-indigo-400">${project.name}</span>
+                            ${urgentTag}
+                            <span id="countdown-timer" class="ml-2 text-base font-bold"></span>
+                        </span>
+                        <div class="flex space-x-2">
+                            <button onclick="window.openResetConfirmModal()" class="text-yellow-400 hover:text-yellow-300 p-1 rounded-full"><svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg></button>
+                            <button onclick="window.openEditModal()" class="text-indigo-400 hover:text-indigo-300 p-1 rounded-full"><svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg></button>
+                            <button onclick="window.openDeleteConfirmModal()" class="text-red-500 hover:text-red-400 p-1 rounded-full"><svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
+                        </div>
+                    </div>
+                </h2>
+                <div class="mt-2 grid grid-cols-[max-content_auto] gap-x-4 gap-y-1">
+                    <span class="text-xs text-gray-400">Total Target Quantity:</span>
+                    <span class="text-xs text-gray-400"><span class="font-extrabold text-lime-400">${project.totalQuantity.toLocaleString('en-US')}</span> Units</span>
+                </div>
+            `;
+            
+            // Countdown Logic
+            if (project.isUrgent && project.targetDate) {
+                const countdownElement = document.getElementById('countdown-timer');
+                const targetDateTime = new Date(`${project.targetDate}T${project.targetTime || '00:00:00'}`);
+                const finalStageDone = project.hasPalletStage ? project.palletDone : project.packingDone;
+                const isComplete = finalStageDone === project.totalQuantity && project.totalQuantity > 0;
+
+                if (countdownElement && !isNaN(targetDateTime)) {
+                    if (isComplete) {
+                        countdownElement.innerHTML = 'TARGET TERCAPAI';
+                        countdownElement.className = 'ml-3 text-base font-bold text-green-400';
+                    } else {
+                        const updateCountdown = () => {
+                            const now = new Date();
+                            const diff = targetDateTime - now;
+                            if (diff <= 0) {
+                                countdownElement.innerHTML = 'TERLAMBAT!!!';
+                                countdownElement.className = 'ml-3 text-base font-extrabold text-red-500 blinking-urgent';
+                                if (countdownInterval) clearInterval(countdownInterval);
+                                return;
+                            }
+                            const hours = Math.floor(diff / (1000 * 60 * 60));
+                            const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                            countdownElement.innerHTML = `${hours}h ${minutes}m`;
+                            countdownElement.className = diff < 3600000 ? 'ml-3 text-base font-bold text-red-500' : 'ml-3 text-base font-bold text-green-400';
+                        };
+                        updateCountdown();
+                        countdownInterval = setInterval(updateCountdown, 1000);
+                    }
+                }
+            }
+
+            // Chart
+            const ctx = document.getElementById('progressChart').getContext('2d');
+            if (typeof ChartDataLabels !== 'undefined' && Chart.registry.plugins.get('datalabels') === undefined) Chart.register(ChartDataLabels);
+            if (chartInstance) chartInstance.destroy();
+
+            const chartLabels = ['Assemble', 'Quality Control', project.hasPalletStage ? 'Wrapping' : 'Packing'];
+            const chartDataDone = [ project.rakitDone, project.qcDone, project.packingDone ];
+            const chartColors = ['#3b82f6', '#10b981', '#f97316'];
+            
+            if(project.hasPalletStage) {
+                chartLabels.push('Packing Pallet');
+                chartDataDone.push(project.palletDone);
+                chartColors.push('#8b5cf6');
+            }
+            
+            // Pending data for stacked bar
+            const chartDataPending = chartDataDone.map(done => project.totalQuantity - done);
+
+            chartInstance = new Chart(ctx, {
+                type: 'bar',
+                plugins: [ChartDataLabels],
+                data: {
+                    labels: chartLabels,
+                    datasets: [
+                        { label: 'Done', data: chartDataDone, backgroundColor: chartColors, borderRadius: 6, datalabels: { display: true, color: 'white', anchor: 'end', align: 'end' } },
+                        { label: 'Pending', data: chartDataPending, backgroundColor: '#4b5563', borderRadius: 6, datalabels: { display: false } }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: { x: { stacked: true, grid: {color: '#374151'}, ticks: {color:'white'} }, y: { stacked: true, grid: {color: '#374151'}, ticks: {color:'white'} } },
+                    plugins: { title: { display: true, text: project.name, color: 'white', font: {size: 22} }, legend: { labels: { color: 'white' } } }
+                }
+            });
+
+            // Cards Logic
+            const baseStages = [
+                { id: 'rakit', name: 'Assemble', color: 'blue', current: project.rakitDone, max: project.totalQuantity, icon: `<svg class="h-4 w-4 text-blue-400 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s2-4 5-4 5 4 5 4 2 4 5 4 5-4 5-4"/></svg>` },
+                { id: 'qc', name: 'Quality Control', color: 'green', current: project.qcDone, max: project.rakitDone, icon: `<svg class="h-4 w-4 text-green-400 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>` },
+                { id: 'packing', name: project.hasPalletStage ? 'Wrapping' : 'Packing', color: 'orange', current: project.packingDone, max: project.qcDone, icon: `<svg class="h-4 w-4 text-orange-400 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v2"/><path d="M12 22v-8"/><path d="M20 16v-4"/><path d="M4 16v-4"/><path d="M2 16h20"/></svg>` },
+            ];
+            if(project.hasPalletStage) {
+                baseStages.push({ id: 'pallet', name: 'Packing Pallet', color: 'purple', current: project.palletDone, max: project.packingDone, icon: `<svg class="h-4 w-4 text-purple-400 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2" /><line x1="6" y1="7" x2="6" y2="21" /><line x1="18" y1="7" x2="18" y2="21" /><line x1="2" y1="13" x2="22" y2="13" /></svg>` });
+            }
+
+            const cardsHtml = baseStages.map(stage => {
+                const available = stage.max - stage.current;
+                const progressPercent = project.totalQuantity > 0 ? Math.round((stage.current / project.totalQuantity) * 100) : 0;
+                
+                // Button States
+                const canInc = stage.id === 'rakit' ? stage.current < stage.max : available > 0;
+                const canDec = stage.current > 0;
+                const incClass = canInc ? `bg-${stage.color}-600 hover:bg-${stage.color}-500` : 'bg-gray-600 cursor-not-allowed';
+                const decClass = canDec ? 'bg-red-600 hover:bg-red-500' : 'bg-gray-700 cursor-not-allowed';
+
+                // Special case for Pallet logic override
+                if (stage.id === 'pallet') {
+                    const numPallets = Math.ceil(stage.current / 2);
+                    const maxPallets = Math.ceil(project.totalQuantity / 2);
+                    return `
+                        <div class="progress-card bg-gray-800 p-2 rounded-lg shadow-lg border-t-2 border-purple-500 flex flex-col justify-between">
+                            <div>
+                                <h3 class="flex items-center text-sm font-bold text-purple-400 mb-0">${stage.icon} ${stage.name}</h3>
+                                <div class="flex items-center justify-between">
+                                    <p class="text-lg font-extrabold text-gray-100">${numPallets} Pallets</p>
+                                    <button onclick="window.openManualInputModal('pallet', 'Pallet')" class="text-gray-400 hover:text-white p-1"><svg class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20"><path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" /><path fill-rule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clip-rule="evenodd" /></svg></button>
+                                </div>
+                                <p class="text-xs text-gray-400 mb-2">Max: ${maxPallets}</p>
+                            </div>
+                            <div class="mt-2 flex justify-between">
+                                <button onclick="window.handlePalletDecrement()" class="p-1.5 ${decClass} text-white rounded-full h-7 w-7 flex items-center justify-center">-</button>
+                                <button onclick="window.handlePalletIncrement()" class="p-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-full h-7 w-7 flex items-center justify-center">+</button>
+                            </div>
+                        </div>`;
+                }
+
+                return `
+                    <div class="progress-card bg-gray-800 p-2 rounded-lg shadow-lg border-t-2 border-${stage.color}-500 flex flex-col justify-between">
+                        <div>
+                            <h3 class="flex items-center text-sm font-bold text-${stage.color}-400 mb-0">${stage.icon} ${stage.name}</h3>
+                            <div class="flex items-center justify-between">
+                                <p class="text-lg font-extrabold text-gray-100">${stage.current}</p>
+                                <button onclick="window.openManualInputModal('${stage.id}', '${stage.name}')" class="text-gray-400 hover:text-white p-1"><svg class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20"><path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" /><path fill-rule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clip-rule="evenodd" /></svg></button>
+                            </div>
+                            <p class="text-xs text-gray-400 mb-2">${stage.id === 'rakit' ? 'Target: '+project.totalQuantity : 'Max: '+stage.max}</p>
+                        </div>
+                        <div class="w-full bg-gray-700 rounded-full h-1.5"><div class="bg-${stage.color}-500 h-1.5 rounded-full" style="width: ${progressPercent}%"></div></div>
+                        <div class="mt-2 flex justify-between">
+                            <button onclick="window.handleProgressDecrement('${stage.id}')" class="p-1.5 ${decClass} text-white rounded-full h-7 w-7 flex items-center justify-center">-</button>
+                            <button onclick="window.handleProgressIncrement('${stage.id}')" class="p-1.5 ${incClass} text-white rounded-full h-7 w-7 flex items-center justify-center">+</button>
+                        </div>
+                    </div>`;
+            }).join('');
+            
+            const progressCardsContainer = document.getElementById('progress-cards');
+            progressCardsContainer.innerHTML = cardsHtml;
+            progressCardsContainer.className = `grid grid-cols-1 sm:grid-cols-2 gap-4 md:grid-cols-${baseStages.length}`;
+        }
+
+        function renderGlobalHistory() {
+            const historyContainer = document.getElementById('global-history-container');
+            if (!historyContainer) return;
+            
+            if (globalHistory.length === 0) {
+                historyContainer.innerHTML = '<div class="bg-gray-800 p-4 rounded-xl shadow-lg"><h2 class="text-xl font-bold text-gray-100">History</h2><p class="text-gray-500 text-center py-4">No activity yet.</p></div>';
+                return;
+            }
+
+            const historyItems = globalHistory.map(log => {
+                const { date, time } = getFormattedDateTime(log.timestamp);
+                let color = 'gray';
+                if(log.type === 'CREATE') color = 'green';
+                else if(log.type === 'DELETE') color = 'red';
+                else if(log.type === 'PROGRESS') color = 'blue';
+                return `<li class="border-b border-gray-700/50 py-2"><span class="text-${color}-400 font-bold text-xs">[${log.type}]</span> <span class="text-gray-300 text-xs">${log.message}</span> <span class="text-[10px] text-gray-500 float-right">${time}</span></li>`;
+            }).join('');
+
+            historyContainer.innerHTML = `
+                <div class="bg-gray-800 p-4 rounded-xl shadow-lg">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-bold text-gray-100">Live History</h2>
+                        <button onclick="window.openClearHistoryConfirmModal()" class="text-red-500 hover:text-red-400 text-xs">Clear</button>
+                    </div>
+                    <ul class="max-h-60 overflow-y-auto pr-2">${historyItems}</ul>
+                </div>`;
+        }
+
+        // Init
+        window.onload = () => {
+            initFirebase(); // Connect to cloud
+            
+            // Listeners
+            document.getElementById('btnAddProject').onclick = () => openModal('addProjectModal');
+            document.getElementById('closeModalBtn').onclick = () => closeModal('addProjectModal');
+            document.getElementById('projectForm').onsubmit = window.handleAddProjectSubmit;
+            
+            // Add other event listeners...
+            document.getElementById('projectUrgent').addEventListener('change', (e) => document.getElementById('urgent-options').classList.toggle('hidden', !e.target.checked));
+            document.getElementById('editProjectUrgent').addEventListener('change', (e) => document.getElementById('edit-urgent-options').classList.toggle('hidden', !e.target.checked));
+
+            document.getElementById('closeDeleteModalBtn').onclick = () => closeModal('deleteConfirmModal');
+            document.getElementById('closeEditModalBtn').onclick = () => closeModal('editProjectModal');
+            document.getElementById('closeImportModalBtn').onclick = () => closeModal('importConfirmModal');
+            document.getElementById('closeClearHistoryModalBtn').onclick = () => closeModal('clearHistoryConfirmModal');
+            document.getElementById('confirmClearHistoryButton').onclick = window.clearAllHistory;
+            document.getElementById('closeResetModalBtn').onclick = () => closeModal('resetConfirmModal');
+            document.getElementById('closeManualInputModalBtn').onclick = () => closeModal('manualInputModal');
+            document.getElementById('closeManualPalletModalBtn').onclick = () => closeModal('manualPalletInputModal');
+            document.getElementById('btnDeleteAll').onclick = window.openDeleteAllConfirmModal;
+            document.getElementById('closeDeleteAllModalBtn').onclick = () => closeModal('deleteAllConfirmModal');
+            document.getElementById('confirmDeleteAllButton').onclick = window.deleteAllProjectsConfirmed;
+
+            document.getElementById('btnExportData').onclick = window.exportData;
+            document.getElementById('btnImportData').onclick = window.triggerImport;
+            document.getElementById('btnDownloadImage').onclick = window.downloadDashboardAsImage;
+            document.getElementById('import-file-input').onchange = window.importData;
+            
+            document.getElementById('user-info').textContent = 'Design By Kurniawan Didi (Cloud Mode)';
+            startLiveClock();
+        };
+    </script>
+
+    <!-- UI Structure -->
+    <div class="container mx-auto p-4 sm:p-8">
+        <header class="mb-8 border-b pb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center border-gray-700">
+            <div>
+                <h1 class="text-3xl font-extrabold italic text-gray-100">Microvision</h1>
+                <p class="text-lg text-gray-300 -mt-1">Production Assembly Management</p>
+                <p id="user-info" class="text-xs text-gray-400 mt-2">Design By Kurniawan Didi</p>
+            </div>
+            
+            <div id="header-buttons" class="mt-4 sm:mt-0 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                <div class="flex items-center gap-3">
+                    <button id="btnImportData" title="Import" class="bg-teal-600 hover:bg-teal-500 text-white font-semibold py-2 px-4 rounded-xl shadow-lg flex items-center justify-center space-x-2 text-sm w-full sm:w-auto">
+                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M8.5 11.5a.5.5 0 0 1-1 0V7.707L6.354 8.854a.5.5 0 1 1-.708-.708l2-2a.5.5 0 0 1 .708 0l2 2a.5.5 0 0 1-.708.708L8.5 7.707z"/><path d="M14 14V4.5L9.5 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2M9.5 3A1.5 1.5 0 0 0 11 4.5h2V14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h5.5z"/></svg>
+                        <span>Import</span>
+                    </button>
+                     <button id="btnExportData" title="Backup" class="bg-gray-600 hover:bg-gray-500 text-white font-semibold py-2 px-4 rounded-xl shadow-lg flex items-center justify-center space-x-2 text-sm w-full sm:w-auto">
+                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M8.5 6.5a.5.5 0 0 0-1 0v3.793l-1.146-1.147a.5.5 0 1 0-.708.708l2 2a.5.5 0 0 0 .708 0l2-2a.5.5 0 0 0-.708-.708L8.5 10.293z"/><path d="M14 14V4.5L9.5 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2M9.5 3A1.5 1.5 0 0 0 11 4.5h2V14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h5.5z"/></svg>
+                        <span>Backup</span>
+                    </button>
+                    <button id="btnDownloadImage" title="Screenshot" class="bg-purple-600 hover:bg-purple-500 text-white font-semibold py-2 px-4 rounded-xl shadow-lg flex items-center justify-center space-x-2 text-sm w-full sm:w-auto">
+                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L6.354 8.146a.5.5 0 1 0-.708.708z"/></svg>
+                        <span>Shot</span>
+                    </button>
+                    <input type="file" id="import-file-input" class="hidden" accept=".json">
+                </div>
+                <div class="flex items-center gap-3">
+                    <button id="btnAddProject" class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2 px-4 rounded-xl shadow-lg flex items-center justify-center space-x-1 text-sm w-full sm:w-auto pulse-effect">
+                        <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clip-rule="evenodd" /></svg>
+                        <span>Add Assembly</span>
+                    </button>
+                     <button id="btnDeleteAll" title="Reset All" class="bg-red-700 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-xl shadow-lg flex items-center justify-center space-x-2 text-sm w-full sm:w-auto">
+                        <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 012 0v6a1 1 0 11-2 0V8z" clip-rule="evenodd" /></svg>
+                    </button>
                 </div>
             </div>
+        </header>
+
+        <div id="dashboard-header" class="mb-6"></div>
+        <div id="notification-box" class="opacity-0 pointer-events-none fixed top-4 right-4 p-4 rounded-lg text-white shadow-xl z-50 transition-all duration-300"></div>
+
+        <div id="main-grid-content" class="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-6">
+            <div id="project-list-container" class="lg:sticky lg:top-8 lg:self-start flex flex-col"></div>
+            <div id="detailed-project-view" class="space-y-6 hidden pt-6 lg:pt-0 border-t border-gray-700 lg:border-t-0">
+                <div id="assembly-details-container" class="bg-gray-800 p-3 rounded-xl shadow-lg border-l-4 border-indigo-500"></div>
+                <div class="bg-gray-800 p-6 rounded-xl shadow-lg h-[450px]">
+                    <canvas id="progressChart"></canvas>
+                </div>
+                <div>
+                    <h2 class="text-xl font-bold text-gray-100 mb-4">Update Production Progress</h2>
+                    <div id="progress-cards" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4"></div>
+                </div>
+                <div id="global-history-container" class="mt-6"></div>
+            </div>
         </div>
-    </main>
+    </div>
 
-    <footer class="text-center p-8 text-gray-600 text-sm">
-        <p id="user-info">Design By Kurniawan Didi</p>
-    </footer>
+    <!-- Modals (Add, Edit, Delete, Import, History, etc.) -->
+    <!-- Add Project Modal -->
+    <div id="addProjectModal" class="modal fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 opacity-0 pointer-events-none p-4">
+        <div class="bg-gray-800 rounded-xl shadow-2xl w-full max-w-lg">
+            <div class="p-6 border-b flex justify-between items-center border-gray-700">
+                <h2 class="text-2xl font-bold text-gray-100">Add New Assembly</h2>
+                <button id="closeModalBtn" class="text-gray-400 hover:text-gray-200"><svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg></button>
+            </div>
+            <form id="projectForm" class="p-6 space-y-5">
+                <div><label class="block text-sm font-medium text-gray-300">Assembly Name</label><input type="text" id="projectName" required class="mt-1 block w-full p-3 border border-gray-600 bg-gray-700 text-gray-100 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500"></div>
+                <div><label class="block text-sm font-medium text-gray-300">Total Quantity</label><input type="number" id="projectQuantity" required min="1" class="mt-1 block w-full p-3 border border-gray-600 bg-gray-700 text-gray-100 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500"></div>
+                <div class="space-y-4">
+                    <div class="flex items-center"><input id="projectHasPallet" type="checkbox" class="h-4 w-4 rounded bg-gray-700 text-indigo-600"><label for="projectHasPallet" class="ml-3 block text-sm font-medium text-gray-300">Include "Packing Pallet"</label></div>
+                    <div class="flex items-center"><input id="projectUrgent" type="checkbox" class="h-4 w-4 rounded bg-gray-700 text-indigo-600"><label for="projectUrgent" class="ml-3 block text-sm font-medium text-gray-300">Mark as "Urgent"</label></div>
+                    <div id="urgent-options" class="hidden pl-7 space-y-3 pt-2">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div><label class="block text-xs font-medium text-gray-300">Date</label><input type="date" id="projectTargetDate" class="mt-1 block w-full p-2 border border-gray-600 bg-gray-700 text-gray-100 rounded-lg text-sm"></div>
+                            <div><label class="block text-xs font-medium text-gray-300">Time</label><input type="time" id="projectTargetTime" class="mt-1 block w-full p-2 border border-gray-600 bg-gray-700 text-gray-100 rounded-lg text-sm"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex justify-end pt-2"><button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-3 px-6 rounded-xl shadow-md">Save Assembly</button></div>
+            </form>
+        </div>
+    </div>
 
-    <div id="addProjectModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 opacity-0 pointer-events-none modal">
-        <div class="bg-gray-800 rounded-2xl border border-gray-700 w-full max-w-md p-6">
-            <h2 class="text-xl font-bold mb-4 text-blue-400">Create New Assembly</h2>
-            <form id="projectForm" class="space-y-4">
-                <div>
-                    <label class="block text-xs text-gray-500 mb-1">Assembly Name</label>
-                    <input type="text" id="projectName" required class="w-full bg-gray-900 border border-gray-600 rounded-lg p-2 outline-none">
+    <!-- Edit Modal -->
+    <div id="editProjectModal" class="modal fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 opacity-0 pointer-events-none p-4">
+        <div class="bg-gray-800 rounded-xl shadow-2xl w-full max-w-lg">
+            <div class="p-6 border-b flex justify-between items-center border-gray-700">
+                <h2 class="text-2xl font-bold text-gray-100">Edit Assembly</h2>
+                <button id="closeEditModalBtn" class="text-gray-400 hover:text-gray-200"><svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg></button>
+            </div>
+            <form id="editProjectForm" class="p-6 space-y-5">
+                <div><label class="block text-sm font-medium text-gray-300">Name</label><input type="text" id="editProjectName" required class="mt-1 block w-full p-3 border border-gray-600 bg-gray-700 text-gray-100 rounded-lg"></div>
+                <div><label class="block text-sm font-medium text-gray-300">Quantity</label><input type="number" id="editProjectQuantity" required min="1" class="mt-1 block w-full p-3 border border-gray-600 bg-gray-700 text-gray-100 rounded-lg"></div>
+                 <div class="space-y-4">
+                    <div class="flex items-center"><input id="editProjectHasPallet" type="checkbox" class="h-4 w-4 bg-gray-700"><label for="editProjectHasPallet" class="ml-3 block text-sm font-medium text-gray-300">Has Pallet Stage</label></div>
+                    <div class="flex items-center"><input id="editProjectUrgent" type="checkbox" class="h-4 w-4 bg-gray-700"><label for="editProjectUrgent" class="ml-3 block text-sm font-medium text-gray-300">Urgent</label></div>
+                    <div id="edit-urgent-options" class="hidden pl-7 space-y-3 pt-2">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div><label class="block text-xs font-medium text-gray-300">Date</label><input type="date" id="editProjectTargetDate" class="mt-1 block w-full p-2 border border-gray-600 bg-gray-700 text-gray-100 rounded-lg text-sm"></div>
+                            <div><label class="block text-xs font-medium text-gray-300">Time</label><input type="time" id="editProjectTargetTime" class="mt-1 block w-full p-2 border border-gray-600 bg-gray-700 text-gray-100 rounded-lg text-sm"></div>
+                        </div>
+                    </div>
                 </div>
-                <div>
-                    <label class="block text-xs text-gray-500 mb-1">Total Quantity</label>
-                    <input type="number" id="projectQuantity" required class="w-full bg-gray-900 border border-gray-600 rounded-lg p-2 outline-none">
-                </div>
-                <div class="flex items-center gap-4 py-2">
-                    <label class="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" id="projectUrgent" class="w-4 h-4"> <span class="text-sm">Urgent Priority</span>
-                    </label>
-                    <label class="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" id="projectHasPallet" class="w-4 h-4"> <span class="text-sm">Add Pallet Stage</span>
-                    </label>
-                </div>
-                <div class="flex justify-end gap-2">
-                    <button type="button" onclick="closeModal('addProjectModal')" class="text-gray-400 px-4">Cancel</button>
-                    <button type="submit" class="bg-blue-600 px-6 py-2 rounded-lg font-bold">Save to Cloud</button>
+                <div class="flex justify-end pt-2"><button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-6 rounded-xl">Save Changes</button></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Delete Confirm -->
+    <div id="deleteConfirmModal" class="modal fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 opacity-0 pointer-events-none p-4">
+        <div class="bg-gray-800 rounded-xl shadow-2xl w-full max-w-sm p-6">
+            <h2 class="text-xl font-bold text-red-400 mb-4">Confirm Deletion</h2>
+            <p id="deleteConfirmText" class="text-gray-300 mb-6">Delete this?</p>
+            <div class="flex justify-end space-x-3">
+                <button id="closeDeleteModalBtn" class="px-4 py-2 text-sm font-semibold rounded-lg bg-gray-700 text-gray-100">Cancel</button>
+                <button id="confirmDeleteButton" class="px-4 py-2 text-sm font-semibold rounded-lg bg-red-600 text-white">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import Confirm -->
+    <div id="importConfirmModal" class="modal fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 opacity-0 pointer-events-none p-4">
+        <div class="bg-gray-800 rounded-xl shadow-2xl w-full max-w-sm p-6">
+            <h2 class="text-xl font-bold text-teal-400 mb-4">Overwrite Cloud Data?</h2>
+            <p class="text-gray-300 mb-6">This will delete all current live data and replace it with the file. Cannot be undone.</p>
+            <div class="flex justify-end space-x-3">
+                <button id="closeImportModalBtn" class="px-4 py-2 text-sm font-semibold rounded-lg bg-gray-700 text-gray-100">Cancel</button>
+                <button id="confirmImportButton" class="px-4 py-2 text-sm font-semibold rounded-lg bg-teal-600 text-white">Yes, Overwrite</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- History Clear Confirm -->
+    <div id="clearHistoryConfirmModal" class="modal fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 opacity-0 pointer-events-none p-4">
+        <div class="bg-gray-800 rounded-xl shadow-2xl w-full max-w-sm p-6">
+            <h2 class="text-xl font-bold text-red-400 mb-4">Clear History</h2>
+            <p class="text-gray-300 mb-6">Clear all activity logs?</p>
+            <div class="flex justify-end space-x-3">
+                <button id="closeClearHistoryModalBtn" class="px-4 py-2 text-sm font-semibold rounded-lg bg-gray-700 text-gray-100">Cancel</button>
+                <button id="confirmClearHistoryButton" class="px-4 py-2 text-sm font-semibold rounded-lg bg-red-600 text-white">Clear</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reset Confirm -->
+    <div id="resetConfirmModal" class="modal fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 opacity-0 pointer-events-none p-4">
+        <div class="bg-gray-800 rounded-xl shadow-2xl w-full max-w-sm p-6">
+            <h2 class="text-xl font-bold text-yellow-400 mb-4">Confirm Reset</h2>
+            <p id="resetConfirmText" class="text-gray-300 mb-6">Reset progress?</p>
+            <div class="flex justify-end space-x-3">
+                <button id="closeResetModalBtn" class="px-4 py-2 text-sm font-semibold rounded-lg bg-gray-700 text-gray-100">Cancel</button>
+                <button id="confirmResetButton" class="px-4 py-2 text-sm font-semibold rounded-lg bg-yellow-600 text-white">Reset</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete All Confirm -->
+    <div id="deleteAllConfirmModal" class="modal fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 opacity-0 pointer-events-none p-4">
+        <div class="bg-gray-800 rounded-xl shadow-2xl w-full max-w-sm p-6">
+            <h2 class="text-xl font-bold text-red-400 mb-4">Nuclear Option</h2>
+            <p class="text-gray-300 mb-6">Delete ALL assemblies? This removes everything from the cloud.</p>
+            <div class="flex justify-end space-x-3">
+                <button id="closeDeleteAllModalBtn" class="px-4 py-2 text-sm font-semibold rounded-lg bg-gray-700 text-gray-100">Cancel</button>
+                <button id="confirmDeleteAllButton" class="px-4 py-2 text-sm font-semibold rounded-lg bg-red-600 text-white">Delete All</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Manual Input Modal -->
+    <div id="manualInputModal" class="modal fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 opacity-0 pointer-events-none p-4">
+        <div class="bg-gray-800 rounded-xl shadow-2xl w-full max-w-sm">
+            <div class="p-6 border-b flex justify-between items-center border-gray-700">
+                <h2 id="manualInputModalTitle" class="text-xl font-bold text-gray-100">Update</h2>
+                <button id="closeManualInputModalBtn" class="text-gray-400 hover:text-gray-200"><svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg></button>
+            </div>
+            <form id="manualInputForm" class="p-6 space-y-4">
+                <div><label class="block text-sm font-medium text-gray-300">New Quantity</label><input type="number" id="manualProgressValue" required min="0" class="mt-1 block w-full p-3 border border-gray-600 bg-gray-700 text-gray-100 rounded-lg"></div>
+                <div class="flex justify-end pt-2 space-x-3">
+                    <button type="button" onclick="closeModal('manualInputModal')" class="bg-gray-600 hover:bg-gray-500 text-white font-semibold py-2 px-4 rounded-xl">Cancel</button>
+                    <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2 px-4 rounded-xl">Save</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <div id="notification-box" class="fixed top-4 right-4 p-4 rounded-lg text-white shadow-xl z-50 opacity-0 pointer-events-none transition-all duration-300"></div>
-
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, doc, setDoc, onSnapshot, collection, updateDoc, deleteDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-
-        // === MASUKKAN CONFIG FIREBASE ANDA DI SINI ===
-        const firebaseConfig = {
-            apiKey: "AIzaSy...",
-            authDomain: "project-id.firebaseapp.com",
-            projectId: "project-id",
-            storageBucket: "project-id.appspot.com",
-            messagingSenderId: "123456789",
-            appId: "1:123456789:web:abcdef"
-        };
-
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-
-        // State Global (Sesuai script asli Anda)
-        let projects = [];
-        let currentProjectId = null;
-        let currentFilter = 'All';
-        let chartInstance = null;
-
-        // --- Sinkronisasi Cloud (Real-time) ---
-        function initCloudSync() {
-            onSnapshot(collection(db, "projects"), (snapshot) => {
-                projects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                renderUI();
-            });
-        }
-
-        // --- Logika Inti (Copy dari Script ProgresRakitanV2.html Anda) ---
-        
-        // Simpan Data
-        document.getElementById('projectForm').onsubmit = async (e) => {
-            e.preventDefault();
-            const id = 'proj_' + Date.now();
-            const newData = {
-                name: document.getElementById('projectName').value,
-                totalQuantity: parseInt(document.getElementById('projectQuantity').value),
-                isUrgent: document.getElementById('projectUrgent').checked,
-                hasPalletStage: document.getElementById('projectHasPallet').checked,
-                rakitDone: 0, qcDone: 0, packingDone: 0, palletDone: 0,
-                createdAt: new Date().toISOString()
-            };
-            await setDoc(doc(db, "projects", id), newData);
-            closeModal('addProjectModal');
-            showNotification('Project Launched!', 'success');
-        };
-
-        // Update Progress (Logika Validasi Anda tetap dijaga)
-        window.updateStage = async (id, stage, amount) => {
-            const project = projects.find(p => p.id === id);
-            const newValue = project[stage] + amount;
-            
-            // Validasi (Berdasarkan script asli Anda)
-            if (newValue < 0 || newValue > project.totalQuantity) return;
-            if (stage === 'qcDone' && newValue > project.rakitDone) return showNotification('QC cannot exceed Assembly!', 'warning');
-            if (stage === 'packingDone' && newValue > project.qcDone) return showNotification('Packing cannot exceed QC!', 'warning');
-
-            await updateDoc(doc(db, "projects", id), { [stage]: newValue });
-        };
-
-        window.deleteProject = async (id) => {
-            if (confirm('Are you sure?')) {
-                await deleteDoc(doc(db, "projects", id));
-                if (currentProjectId === id) currentProjectId = null;
-            }
-        };
-
-        // --- Fungsi Visual ---
-        function renderUI() {
-            const list = document.getElementById('project-list-container');
-            list.innerHTML = '';
-            
-            const filtered = currentFilter === 'Urgent' ? projects.filter(p => p.isUrgent) : projects;
-
-            filtered.forEach(p => {
-                const perc = ((p.packingDone / p.totalQuantity) * 100).toFixed(0);
-                const activeClass = p.id === currentProjectId ? 'ring-2 ring-blue-500' : 'border-gray-700';
-                list.innerHTML += `
-                    <div onclick="selectProject('${p.id}')" class="bg-gray-800 p-4 rounded-xl border-2 ${activeClass} cursor-pointer hover:bg-gray-750 transition-all ${p.isUrgent ? 'border-l-4 border-l-red-500' : ''}">
-                        <div class="flex justify-between items-center mb-2">
-                            <span class="font-bold truncate">${p.name}</span>
-                            <span class="text-xs font-mono text-blue-400">${perc}%</span>
-                        </div>
-                        <div class="w-full bg-gray-900 h-1.5 rounded-full overflow-hidden">
-                            <div class="bg-blue-500 h-full" style="width: ${perc}%"></div>
-                        </div>
-                    </div>
-                `;
-            });
-
-            if (currentProjectId) {
-                const active = projects.find(p => p.id === currentProjectId);
-                if (active) renderDetail(active);
-            }
-        }
-
-        function renderDetail(p) {
-            const container = document.getElementById('assembly-details-container');
-            const stages = ['rakitDone', 'qcDone', 'packingDone'];
-            if (p.hasPalletStage) stages.push('palletDone');
-
-            container.innerHTML = `
-                <div class="flex justify-between items-start mb-6">
-                    <div>
-                        <h2 class="text-2xl font-bold text-white">${p.name}</h2>
-                        <span class="text-xs text-gray-500 uppercase tracking-widest">Quantity: ${p.totalQuantity} Units</span>
-                    </div>
-                    <button onclick="deleteProject('${p.id}')" class="text-gray-500 hover:text-red-500 transition-colors">Delete</button>
+    <!-- Manual Pallet Modal -->
+    <div id="manualPalletInputModal" class="modal fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 opacity-0 pointer-events-none p-4">
+        <div class="bg-gray-800 rounded-xl shadow-2xl w-full max-w-sm">
+            <div class="p-6 border-b flex justify-between items-center border-gray-700">
+                <h2 id="manualPalletModalTitle" class="text-xl font-bold text-gray-100">Update Pallets</h2>
+                <button id="closeManualPalletModalBtn" class="text-gray-400 hover:text-gray-200"><svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg></button>
+            </div>
+            <form id="manualPalletForm" class="p-6 space-y-4">
+                <div><label class="block text-sm font-medium text-gray-300">New Pallet Count</label><input type="number" id="manualPalletValue" required min="0" class="mt-1 block w-full p-3 border border-gray-600 bg-gray-700 text-gray-100 rounded-lg"></div>
+                <div class="flex justify-end pt-2 space-x-3">
+                    <button type="button" onclick="closeModal('manualPalletInputModal')" class="bg-gray-600 hover:bg-gray-500 text-white font-semibold py-2 px-4 rounded-xl">Cancel</button>
+                    <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2 px-4 rounded-xl">Save</button>
                 </div>
-                <div class="grid grid-cols-1 gap-4">
-                    ${stages.map(s => `
-                        <div class="bg-gray-900/50 p-4 rounded-xl border border-gray-700">
-                            <div class="flex justify-between text-sm mb-2">
-                                <span class="capitalize text-gray-400">${s.replace('Done','')}</span>
-                                <span class="font-mono text-blue-400">${p[s]} / ${p.totalQuantity}</span>
-                            </div>
-                            <div class="flex items-center gap-3">
-                                <div class="flex-1 bg-gray-700 h-2 rounded-full overflow-hidden">
-                                    <div class="bg-green-500 h-full transition-all" style="width: ${(p[s]/p.totalQuantity)*100}%"></div>
-                                </div>
-                                <div class="flex gap-1">
-                                    <button onclick="updateStage('${p.id}', '${s}', -1)" class="bg-gray-800 hover:bg-gray-700 px-3 py-1 rounded border border-gray-600">-</button>
-                                    <button onclick="updateStage('${p.id}', '${s}', 1)" class="bg-blue-600 hover:bg-blue-500 px-3 py-1 rounded">+</button>
-                                </div>
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            `;
-            updateChart(p);
-        }
-
-        // --- Chart & Helper ---
-        function updateChart(p) {
-            const ctx = document.getElementById('productionChart').getContext('2d');
-            if (chartInstance) chartInstance.destroy();
-            chartInstance = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: ['Assemble', 'QC', 'Packing', 'Pallet'],
-                    datasets: [{
-                        label: 'Units',
-                        data: [p.rakitDone, p.qcDone, p.packingDone, p.palletDone || 0],
-                        backgroundColor: ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6'],
-                        borderRadius: 5
-                    }]
-                },
-                options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, max: p.totalQuantity } } }
-            });
-        }
-
-        window.selectProject = (id) => { currentProjectId = id; renderUI(); };
-        window.setFilter = (f) => { currentFilter = f; renderUI(); };
-        window.openModal = (id) => { document.getElementById(id).classList.remove('opacity-0', 'pointer-events-none'); };
-        window.closeModal = (id) => { document.getElementById(id).classList.add('opacity-0', 'pointer-events-none'); };
-        
-        function showNotification(m, t) {
-            const b = document.getElementById('notification-box');
-            b.textContent = m;
-            b.className = `fixed top-4 right-4 p-4 rounded-lg text-white shadow-xl z-50 transition-all ${t==='success'?'bg-green-600':'bg-red-600'}`;
-            b.classList.remove('opacity-0');
-            setTimeout(() => b.classList.add('opacity-0'), 3000);
-        }
-
-        setInterval(() => {
-            const now = new Date();
-            document.getElementById('current-date-header').textContent = now.toDateString();
-            document.getElementById('current-time-header').textContent = now.toLocaleTimeString();
-        }, 1000);
-
-        // Start
-        initCloudSync();
-    </script>
+            </form>
+        </div>
+    </div>
 </body>
 </html>
