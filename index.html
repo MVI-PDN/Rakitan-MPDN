@@ -46,18 +46,21 @@
         import { getFirestore, doc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- KONFIGURASI FIREBASE ---
-        // Jika Anda hosting di GitHub Pages, Anda HARUS mengisi manualConfig ini dengan data dari Firebase Console Anda.
+        // PENTING: Salin config dari Firebase Console -> Project Settings -> General -> Your apps
+        // Dan tempel di dalam tanda kutip di bawah ini.
         const manualConfig = {
-            apiKey: "",
-            authDomain: "",
-            projectId: "",
-            storageBucket: "",
-            messagingSenderId: "",
-            appId: ""
+            apiKey: "AIzaSyC6WstcJl6t6TrtCzEteiTAqpWNsJrdVko", 
+            authDomain: "data-rakitan.firebaseapp.com", 
+            projectId: "data-rakitan", 
+            storageBucket: "data-rakitan.firebasestorage.app", 
+            messagingSenderId: "277173736548", 
+            appId: "1:277173736548:web:3122a55a3aab03bb9d3b71",
+            measurementId: "G-EY4YY3XG59"
         };
 
         let db, auth, user;
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-assembly-app';
+        // Gunakan ID unik default jika tidak ada environment ID
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'assembly-tracker-v1';
         
         // --- State Management ---
         let projects = [];
@@ -70,6 +73,7 @@
         // --- Inisialisasi Firebase ---
         async function initFirebase() {
             try {
+                // Cek apakah config otomatis tersedia (preview environment) ATAU gunakan manualConfig (hosting sendiri)
                 const configToUse = (typeof __firebase_config !== 'undefined' && __firebase_config) 
                     ? JSON.parse(__firebase_config) 
                     : (manualConfig.apiKey ? manualConfig : null);
@@ -83,6 +87,7 @@
                     if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                          await signInWithCustomToken(auth, __initial_auth_token);
                     } else {
+                         // Pastikan 'Anonymous' sign-in method aktif di Firebase Console -> Authentication
                          await signInAnonymously(auth);
                     }
 
@@ -95,11 +100,11 @@
                     });
                 } else {
                     console.error("Firebase config missing");
-                    showNotification("Firebase config missing. Live sync inactive.", "error");
+                    showNotification("Firebase Config belum diisi. Edit kode HTML ini dan isi 'manualConfig'.", "error");
                 }
             } catch (e) {
                 console.error("Firebase Init Error", e);
-                showNotification("Error connecting to cloud.", "error");
+                showNotification("Gagal koneksi ke Cloud. Cek Config & Rules.", "error");
             }
         }
 
@@ -125,10 +130,15 @@
                 renderAllProjectsDashboard();
             }, (error) => {
                 console.error("Error reading assemblies:", error);
+                // Jika error permission-denied, ingatkan soal Rules
+                if (error.code === 'permission-denied') {
+                    showNotification("Akses ditolak. Cek Firestore Rules di Firebase Console.", "error");
+                }
             });
 
-            // 2. Listen to History (Single doc for simplicity in this version)
-            // PERBAIKAN: Menambahkan 'summary' agar path memiliki 6 segmen (Genap) - Mencegah Error
+            // 2. Listen to History
+            // PERBAIKAN: Path memiliki 6 segmen (Genap) agar valid sebagai Dokumen
+            // Path: artifacts -> {appId} -> public -> data -> global_history -> summary
             const historyDoc = doc(db, 'artifacts', appId, 'public', 'data', 'global_history', 'summary');
             onSnapshot(historyDoc, (docSnap) => {
                 if (docSnap.exists()) {
@@ -149,7 +159,7 @@
                 await setDoc(docRef, project);
             } catch (e) {
                 console.error("Save failed", e);
-                showNotification("Failed to save to cloud", "error");
+                showNotification("Gagal menyimpan data. Cek koneksi.", "error");
             }
         }
 
@@ -179,7 +189,7 @@
 
             // Sync to cloud
             try {
-                // PERBAIKAN: Menambahkan 'summary' agar path konsisten dan valid (6 segmen)
+                // PERBAIKAN: Path konsisten 6 segmen
                 const historyDoc = doc(db, 'artifacts', appId, 'public', 'data', 'global_history', 'summary');
                 await setDoc(historyDoc, { logs: globalHistory });
             } catch (e) {
@@ -352,9 +362,6 @@
         }
 
         // --- Export/Import (Offline features adapted) ---
-        // Note: Import in a live DB context is dangerous (overwrites). 
-        // We will keep Export for backup, but Import will act as "Local Overwrite" or we can disable it.
-        // For now, I'll keep the logic but it will overwrite the Cloud data if used.
         
         window.exportData = () => {
             const dataToExport = { projects, globalHistory };
@@ -390,7 +397,7 @@
                             
                             if(importedData.globalHistory) {
                                 globalHistory = importedData.globalHistory;
-                                // PERBAIKAN: Menambahkan 'summary' pada path history saat import
+                                // PERBAIKAN: Path konsisten 6 segmen
                                 const historyDoc = doc(db, 'artifacts', appId, 'public', 'data', 'global_history', 'summary');
                                 await setDoc(historyDoc, { logs: globalHistory });
                             }
@@ -455,7 +462,7 @@
 
         window.clearAllHistory = async () => {
             globalHistory = [];
-            // PERBAIKAN: Menambahkan 'summary' pada path history saat clear
+            // PERBAIKAN: Path konsisten 6 segmen
             const historyDoc = doc(db, 'artifacts', appId, 'public', 'data', 'global_history', 'summary');
             if(db) await setDoc(historyDoc, { logs: [] });
             
