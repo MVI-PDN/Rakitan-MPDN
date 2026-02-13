@@ -1,0 +1,21 @@
+{
+  "name": "Production Assembly Management",
+  "short_name": "MVI Assembly",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#111827",
+  "theme_color": "#111827",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/9630/9630008.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/9630/9630008.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
