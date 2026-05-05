@@ -863,45 +863,45 @@
             // Memasukkan teks Rekapitulasi Rakitan Harian di atas Chart
             const dailySummaryContainer = document.getElementById('daily-summary-container');
             if (dailySummaryContainer) {
-                // Tanggal Hari Ini
+                // Tanggal Hari Ini (Format diperpendek agar muat bersebelahan di HP)
                 const nowDaily = new Date();
-                const dateTodayFormatted = nowDaily.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+                const dateTodayFormatted = nowDaily.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
                 const todayStr = getTodayDateString();
                 const dailyStatsToday = project.dailyStats && project.dailyStats[todayStr] ? project.dailyStats[todayStr] : { rakit: 0, qc: 0, packing: 0, pallet: 0 };
                 
                 // Tanggal Kemarin
                 const yesterdayDaily = new Date();
                 yesterdayDaily.setDate(yesterdayDaily.getDate() - 1);
-                const dateYesterdayFormatted = yesterdayDaily.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+                const dateYesterdayFormatted = yesterdayDaily.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
                 const yesterdayStr = getYesterdayDateString();
                 const dailyStatsYesterday = project.dailyStats && project.dailyStats[yesterdayStr] ? project.dailyStats[yesterdayStr] : { rakit: 0, qc: 0, packing: 0, pallet: 0 };
 
                 dailySummaryContainer.innerHTML = `
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:divide-x divide-gray-700 w-full mb-4">
+                    <div class="grid grid-cols-2 gap-2 sm:gap-6 divide-x divide-gray-700 w-full mb-4">
                         <!-- Hari Sebelumnya -->
-                        <div class="text-left sm:pr-4 flex flex-col items-center sm:items-end">
-                            <div class="w-max">
-                                <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 border-b border-gray-700 pb-1">Hari Sebelumnya</h4>
-                                <div class="text-sm text-gray-300 space-y-1">
-                                    <div><span class="text-gray-400 w-20 inline-block">Tanggal</span> <span class="mx-1">:</span> <span class="font-medium text-gray-200">${dateYesterdayFormatted}</span></div>
-                                    <div><span class="text-gray-400 w-20 inline-block">Rakit</span> <span class="mx-1">:</span> <span class="font-bold text-blue-400/70">${dailyStatsYesterday.rakit}</span></div>
-                                    <div><span class="text-gray-400 w-20 inline-block">QC</span> <span class="mx-1">:</span> <span class="font-bold text-green-400/70">${dailyStatsYesterday.qc}</span></div>
-                                    <div><span class="text-gray-400 w-20 inline-block">${project.hasPalletStage ? 'Wrapping' : 'Packing'}</span> <span class="mx-1">:</span> <span class="font-bold text-orange-400/70">${dailyStatsYesterday.packing}</span></div>
-                                    ${project.hasPalletStage ? `<div><span class="text-gray-400 w-20 inline-block">Pallet</span> <span class="mx-1">:</span> <span class="font-bold text-purple-400/70">${dailyStatsYesterday.pallet}</span></div>` : ''}
+                        <div class="text-left pr-2 sm:pr-4 flex flex-col items-end">
+                            <div>
+                                <h4 class="text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 border-b border-gray-700 pb-1">Hari Sebelumnya</h4>
+                                <div class="text-[11px] sm:text-sm text-gray-300 space-y-1">
+                                    <div><span class="text-gray-400 w-16 sm:w-20 inline-block">Tanggal</span> <span class="mx-1">:</span> <span class="font-medium text-gray-200">${dateYesterdayFormatted}</span></div>
+                                    <div><span class="text-gray-400 w-16 sm:w-20 inline-block">Rakit</span> <span class="mx-1">:</span> <span class="font-bold text-blue-400/70">${dailyStatsYesterday.rakit}</span></div>
+                                    <div><span class="text-gray-400 w-16 sm:w-20 inline-block">QC</span> <span class="mx-1">:</span> <span class="font-bold text-green-400/70">${dailyStatsYesterday.qc}</span></div>
+                                    <div><span class="text-gray-400 w-16 sm:w-20 inline-block">${project.hasPalletStage ? 'Wrapping' : 'Packing'}</span> <span class="mx-1">:</span> <span class="font-bold text-orange-400/70">${dailyStatsYesterday.packing}</span></div>
+                                    ${project.hasPalletStage ? `<div><span class="text-gray-400 w-16 sm:w-20 inline-block">Pallet</span> <span class="mx-1">:</span> <span class="font-bold text-purple-400/70">${dailyStatsYesterday.pallet}</span></div>` : ''}
                                 </div>
                             </div>
                         </div>
 
                         <!-- Hari Ini -->
-                        <div class="text-left sm:pl-4 flex flex-col items-center sm:items-start pt-4 sm:pt-0 border-t sm:border-t-0 border-gray-700">
-                            <div class="w-max">
-                                <h4 class="text-xs font-bold text-indigo-400 uppercase tracking-wider mb-2 border-b border-indigo-900/50 pb-1">Hari Ini</h4>
-                                <div class="text-sm text-gray-100 space-y-1">
-                                    <div><span class="text-gray-400 w-20 inline-block">Tanggal</span> <span class="mx-1">:</span> <span class="font-semibold text-white">${dateTodayFormatted}</span></div>
-                                    <div><span class="text-gray-400 w-20 inline-block">Rakit</span> <span class="mx-1">:</span> <span class="font-extrabold text-blue-400">${dailyStatsToday.rakit}</span></div>
-                                    <div><span class="text-gray-400 w-20 inline-block">QC</span> <span class="mx-1">:</span> <span class="font-extrabold text-green-400">${dailyStatsToday.qc}</span></div>
-                                    <div><span class="text-gray-400 w-20 inline-block">${project.hasPalletStage ? 'Wrapping' : 'Packing'}</span> <span class="mx-1">:</span> <span class="font-extrabold text-orange-400">${dailyStatsToday.packing}</span></div>
-                                    ${project.hasPalletStage ? `<div><span class="text-gray-400 w-20 inline-block">Pallet</span> <span class="mx-1">:</span> <span class="font-extrabold text-purple-400">${dailyStatsToday.pallet}</span></div>` : ''}
+                        <div class="text-left pl-2 sm:pl-4 flex flex-col items-start">
+                            <div>
+                                <h4 class="text-[10px] sm:text-xs font-bold text-indigo-400 uppercase tracking-wider mb-2 border-b border-indigo-900/50 pb-1">Hari Ini</h4>
+                                <div class="text-[11px] sm:text-sm text-gray-100 space-y-1">
+                                    <div><span class="text-gray-400 w-16 sm:w-20 inline-block">Tanggal</span> <span class="mx-1">:</span> <span class="font-semibold text-white">${dateTodayFormatted}</span></div>
+                                    <div><span class="text-gray-400 w-16 sm:w-20 inline-block">Rakit</span> <span class="mx-1">:</span> <span class="font-extrabold text-blue-400">${dailyStatsToday.rakit}</span></div>
+                                    <div><span class="text-gray-400 w-16 sm:w-20 inline-block">QC</span> <span class="mx-1">:</span> <span class="font-extrabold text-green-400">${dailyStatsToday.qc}</span></div>
+                                    <div><span class="text-gray-400 w-16 sm:w-20 inline-block">${project.hasPalletStage ? 'Wrapping' : 'Packing'}</span> <span class="mx-1">:</span> <span class="font-extrabold text-orange-400">${dailyStatsToday.packing}</span></div>
+                                    ${project.hasPalletStage ? `<div><span class="text-gray-400 w-16 sm:w-20 inline-block">Pallet</span> <span class="mx-1">:</span> <span class="font-extrabold text-purple-400">${dailyStatsToday.pallet}</span></div>` : ''}
                                 </div>
                             </div>
                         </div>
