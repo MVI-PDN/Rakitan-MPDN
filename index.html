@@ -638,12 +638,12 @@
             const { date, time } = getFormattedDateTime(new Date());
             
             headerContainer.innerHTML = `
-                <div class="bg-gray-800 p-4 rounded-xl shadow-lg flex flex-col sm:flex-row justify-between items-center gap-4">
-                    <div class="flex items-center gap-4">
-                        <h2 class="text-xl font-bold text-gray-100 whitespace-nowrap">Current Assemblies</h2>
-                        <div class="flex items-center">
-                            <label for="status-filter" class="text-xs font-medium text-gray-400 mr-2">Status:</label>
-                            <select id="status-filter" class="bg-gray-700 text-gray-200 border border-gray-600 rounded-lg p-1 text-sm focus:ring-indigo-500 focus:border-indigo-500">
+                <div class="bg-gray-800 p-4 rounded-xl shadow-lg flex flex-col md:flex-row justify-between items-center gap-4">
+                    <div class="flex items-center justify-between w-full md:w-auto gap-2">
+                        <h2 class="text-base sm:text-xl font-bold text-gray-100 truncate">Current Assemblies</h2>
+                        <div class="flex items-center shrink-0">
+                            <label for="status-filter" class="text-xs font-medium text-gray-400 mr-1 sm:mr-2">Status:</label>
+                            <select id="status-filter" class="bg-gray-700 text-gray-200 border border-gray-600 rounded-lg p-1 text-xs sm:text-sm focus:ring-indigo-500 focus:border-indigo-500 max-w-[110px] sm:max-w-none">
                                 <option value="All" ${currentFilter === 'All' ? 'selected' : ''}>All</option>
                                 <option value="Completed" ${currentFilter === 'Completed' ? 'selected' : ''}>Completed</option>
                                 <option value="In Progress" ${currentFilter === 'In Progress' ? 'selected' : ''}>In Progress</option>
@@ -652,13 +652,13 @@
                             </select>
                         </div>
                     </div>
-                    <div class="text-sm font-semibold text-gray-300 flex flex-wrap items-center justify-center sm:justify-end gap-x-4 gap-y-2">
+                    <div class="text-xs sm:text-sm font-semibold text-gray-300 flex flex-wrap items-center justify-center md:justify-end gap-x-4 gap-y-2 w-full md:w-auto">
                         <div class="flex items-center">
-                            <svg class="h-5 w-5 mr-2 text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="18" x="3" y="4" rx="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
+                            <svg class="h-4 w-4 sm:h-5 sm:w-5 mr-1 sm:mr-2 text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="18" x="3" y="4" rx="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
                             <span id="current-date-header">${date}</span>
                         </div>
                         <div class="flex items-center">
-                            <svg class="h-5 w-5 mr-2 text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                            <svg class="h-4 w-4 sm:h-5 sm:w-5 mr-1 sm:mr-2 text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                             <span id="current-time-header">${time}</span>
                         </div>
                     </div>
