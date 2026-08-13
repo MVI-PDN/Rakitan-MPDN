@@ -280,7 +280,7 @@
                 packingDone: 0,
                 palletDone: 0,
                 createdAt: nowIso,
-                completedAt: null // Menyimpan waktu selesai
+                completedAt: null
             };
             
             await saveProjectToCloud(newProject);
@@ -308,7 +308,7 @@
                 project.packingDone = 0;
                 project.palletDone = 0;
                 project.dailyStats = {}; 
-                project.completedAt = null; // Reset status waktu selesai
+                project.completedAt = null;
 
                 await addHistoryLog('RESET', `Progress for assembly "${projectName}" has been reset.`);
                 await saveProjectToCloud(project);
@@ -332,7 +332,6 @@
                 project.targetDate = isUrgent ? (targetDate || null) : null;
                 project.targetTime = isUrgent ? (targetTime || null) : null;
                 
-                // Evaluasi ulang status completedAt jika terjadi perubahan total quantity / status selesai
                 const finalStageDone = project.hasPalletStage ? project.palletDone : project.packingDone;
                 if (finalStageDone === project.totalQuantity && project.totalQuantity > 0) {
                     if (!project.completedAt) project.completedAt = new Date().toISOString();
@@ -384,14 +383,13 @@
             
             updateDailyStats(project, stage, quantityChange);
 
-            // Cek status penyelesaian akhir untuk mengunci waktu selesai
             const finalStageDone = project.hasPalletStage ? project.palletDone : project.packingDone;
             if (finalStageDone === project.totalQuantity && project.totalQuantity > 0) {
                 if (!project.completedAt) {
                     project.completedAt = new Date().toISOString();
                 }
             } else {
-                project.completedAt = null; // Aktifkan kembali jika progress dikurangi
+                project.completedAt = null;
             }
             
             renderAllProjectsDashboard();
@@ -816,7 +814,7 @@
             const urgentTag = project.isUrgent ? `<span class="blinking-urgent text-sm font-bold py-1 px-3 rounded-full bg-red-500 text-white ml-3">URGENT</span>` : '';
             const detailsContainer = document.getElementById('assembly-details-container');
 
-            // Hitung durasi/rentang hari pengerjaan (dari createdAt sampai completedAt atau hari ini)
+            // Hitung durasi pengerjaan (dari createdAt sampai completedAt atau sekarang)
             const createdDate = new Date(project.createdAt || Date.now());
             const endOrNowDate = project.completedAt ? new Date(project.completedAt) : new Date();
             const diffTime = Math.abs(endOrNowDate - createdDate);
@@ -881,7 +879,7 @@
             if (typeof ChartDataLabels !== 'undefined' && Chart.registry.plugins.get('datalabels') === undefined) Chart.register(ChartDataLabels);
             if (chartInstance) chartInstance.destroy();
 
-            // Memasukkan teks Rekapitulasi Rakitan Harian di atas Chart (berhenti ketika complete)
+            // Memasukkan teks Rekapitulasi Rakitan Harian & Status Completed + Durasi
             const dailySummaryContainer = document.getElementById('daily-summary-container');
             if (dailySummaryContainer) {
                 const finalStageDone = project.hasPalletStage ? project.palletDone : project.packingDone;
@@ -915,7 +913,12 @@
                     dailyStatsYesterday = project.dailyStats && project.dailyStats[yesterdayStr] ? project.dailyStats[yesterdayStr] : { rakit: 0, qc: 0, packing: 0, pallet: 0 };
                 }
 
-                const completeNoticeHTML = isComplete ? `<div class="mb-2 text-xs font-bold text-green-400 bg-green-950/40 border border-green-800 py-1 px-3 rounded-lg inline-block">Status: COMPLETED (Rekapitulasi terkunci pada hari penyelesaian)</div>` : '';
+                // Posisi badge status lengkap dengan durasi pengerjaan dipindah ke atas chart sesuai permintaan
+                const completeNoticeHTML = isComplete ? `
+                    <div class="mb-3 flex flex-wrap items-center justify-center gap-2">
+                        <span class="text-xs font-bold text-green-400 bg-green-950/60 border border-green-700 py-1 px-3 rounded-lg">Status: COMPLETED </span>
+                        <span class="text-xs font-bold text-teal-300 bg-teal-950/60 border border-teal-700 py-1 px-3 rounded-lg">Total Durasi: ${durationLabel} (${createdDate.toLocaleDateString('id-ID')} s.d. ${new Date(project.completedAt).toLocaleDateString('id-ID')})</span>
+                    </div>` : '';
 
                 dailySummaryContainer.innerHTML = `
                     ${completeNoticeHTML}
@@ -923,7 +926,7 @@
                         <!-- Hari Sebelumnya / Selesai -->
                         <div class="text-left pr-2 sm:pr-4 flex flex-col items-end">
                             <div>
-                                <h4 class="text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 border-b border-gray-700 pb-1">${isComplete ? 'Hari Sebelum Selesai' : 'Hari Sebelumnya'}</h4>
+                                <h4 class="text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 border-b border-gray-700 pb-1">${isComplete ? 'Hari Sebelumnya' : 'Hari Sebelumnya'}</h4>
                                 <div class="text-[11px] sm:text-sm text-gray-300 space-y-1">
                                     <div><span class="text-gray-400 w-16 sm:w-20 inline-block">Tanggal</span> <span class="mx-1">:</span> <span class="font-medium text-gray-200">${dateYesterdayFormatted}</span></div>
                                     <div><span class="text-gray-400 w-16 sm:w-20 inline-block">Rakit</span> <span class="mx-1">:</span> <span class="font-bold text-blue-400/70">${dailyStatsYesterday.rakit}</span></div>
