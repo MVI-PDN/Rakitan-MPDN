@@ -838,7 +838,6 @@
                 </h2>
                 <div class="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs">
                     <div><span class="text-gray-400">Total Target Quantity:</span> <span class="font-extrabold text-lime-400">${project.totalQuantity.toLocaleString('en-US')}</span> Units</div>
-                    <div><span class="text-gray-400">Durasi Pengerjaan:</span> <span class="font-extrabold text-teal-300">${durationLabel}</span> <span class="text-gray-500">(${createdDate.toLocaleDateString('id-ID')} s.d. ${project.completedAt ? new Date(project.completedAt).toLocaleDateString('id-ID') : 'Sekarang'})</span></div>
                 </div>
             `;
             
@@ -894,11 +893,11 @@
                     const compDateStr = project.completedAt.split('T')[0];
                     dailyStatsToday = project.dailyStats && project.dailyStats[compDateStr] ? project.dailyStats[compDateStr] : { rakit: 0, qc: 0, packing: 0, pallet: 0 };
                     
-                    const yDate = new Date(compDate);
-                    yDate.setDate(yDate.getDate() - 1);
-                    dateYesterdayFormatted = yDate.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
-                    const yDateStr = yDate.toISOString().split('T')[0];
-                    dailyStatsYesterday = project.dailyStats && project.dailyStats[yDateStr] ? project.dailyStats[yDateStr] : { rakit: 0, qc: 0, packing: 0, pallet: 0 };
+                    // Hari pertama dibuat/dimulai
+                    const startDateFormatted = createdDate.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+                    const startDateStr = project.createdAt.split('T')[0];
+                    dailyStatsYesterday = project.dailyStats && project.dailyStats[startDateStr] ? project.dailyStats[startDateStr] : { rakit: 0, qc: 0, packing: 0, pallet: 0 };
+                    dateYesterdayFormatted = startDateFormatted;
                 } else {
                     // Berjalan normal real-time
                     const nowDaily = new Date();
@@ -918,15 +917,18 @@
                     <div class="mb-3 flex flex-wrap items-center justify-center gap-2">
                         <span class="text-xs font-bold text-green-400 bg-green-950/60 border border-green-700 py-1 px-3 rounded-lg">Status: COMPLETED </span>
                         <span class="text-xs font-bold text-teal-300 bg-teal-950/60 border border-teal-700 py-1 px-3 rounded-lg">Total Durasi: ${durationLabel} (${createdDate.toLocaleDateString('id-ID')} s.d. ${new Date(project.completedAt).toLocaleDateString('id-ID')})</span>
-                    </div>` : '';
+                    </div>` : `
+                    <div class="mb-3 flex flex-wrap items-center justify-center gap-2">
+                        <span class="text-xs font-bold text-teal-300 bg-teal-950/60 border border-teal-700 py-1 px-3 rounded-lg">Durasi Pengerjaan: ${durationLabel} (${createdDate.toLocaleDateString('id-ID')} s.d. Sekarang)</span>
+                    </div>`;
 
                 dailySummaryContainer.innerHTML = `
                     ${completeNoticeHTML}
                     <div class="grid grid-cols-2 gap-2 sm:gap-6 divide-x divide-gray-700 w-full mb-4">
-                        <!-- Hari Sebelumnya / Selesai -->
+                        <!-- Hari Sebelumnya / Hari Mulai -->
                         <div class="text-left pr-2 sm:pr-4 flex flex-col items-end">
                             <div>
-                                <h4 class="text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 border-b border-gray-700 pb-1">${isComplete ? 'Hari Sebelumnya' : 'Hari Sebelumnya'}</h4>
+                                <h4 class="text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 border-b border-gray-700 pb-1">${isComplete ? 'Hari Pertama (Mulai)' : 'Hari Sebelumnya'}</h4>
                                 <div class="text-[11px] sm:text-sm text-gray-300 space-y-1">
                                     <div><span class="text-gray-400 w-16 sm:w-20 inline-block">Tanggal</span> <span class="mx-1">:</span> <span class="font-medium text-gray-200">${dateYesterdayFormatted}</span></div>
                                     <div><span class="text-gray-400 w-16 sm:w-20 inline-block">Rakit</span> <span class="mx-1">:</span> <span class="font-bold text-blue-400/70">${dailyStatsYesterday.rakit}</span></div>
@@ -1263,7 +1265,7 @@
             <form id="manualPalletForm" class="p-6 space-y-4">
                 <div><label class="block text-sm font-medium text-gray-300">New Pallet Count</label><input type="number" id="manualPalletValue" required min="0" class="mt-1 block w-full p-3 border border-gray-600 bg-gray-700 text-gray-100 rounded-lg"></div>
                 <div class="flex justify-end pt-2 space-x-3">
-                    <button type="button" onclick="closeModal('manualPalletInputModal')" class="bg-gray-600 hover:bg-gray-500 text-white font-semibold py-2 px-4 rounded-xl">Cancel</button>
+                    <button type="button" onclick="closeModal('manualPalletInputModal')" class="bg-gray-600 hover:bg-gray-500 text-white font-semibold py-2 px-4 rounded-xl">Cancel</label>
                     <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2 px-4 rounded-xl">Save</button>
                 </div>
             </form>
