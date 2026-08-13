@@ -70,7 +70,6 @@
         };
 
         let db, auth, user;
-        // Gunakan ID unik default jika tidak ada environment ID
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'assembly-tracker-v1';
         
         // --- State Management ---
@@ -93,7 +92,6 @@
                     auth = getAuth(app);
                     db = getFirestore(app);
 
-                    // Login Logic
                     if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                          await signInWithCustomToken(auth, __initial_auth_token);
                     } else {
@@ -121,7 +119,6 @@
         function setupRealtimeListeners() {
             if (!db) return;
 
-            // 1. Listen to Assemblies
             const assembliesCol = collection(db, 'artifacts', appId, 'public', 'data', 'assemblies');
             
             onSnapshot(assembliesCol, (snapshot) => {
@@ -130,11 +127,8 @@
                     newProjects.push({ ...doc.data(), id: doc.id });
                 });
                 
-                // Keep UI sorting logic
                 projects = newProjects;
                 sortProjects();
-                
-                // Refresh UI
                 renderAllProjectsDashboard();
             }, (error) => {
                 console.error("Error reading assemblies:", error);
@@ -143,7 +137,6 @@
                 }
             });
 
-            // 2. Listen to History
             const historyDoc = doc(db, 'artifacts', appId, 'public', 'data', 'global_history', 'summary');
             onSnapshot(historyDoc, (docSnap) => {
                 if (docSnap.exists()) {
@@ -156,7 +149,6 @@
         }
 
         // --- Data Helpers ---
-        
         async function saveProjectToCloud(project) {
             if (!db) return;
             try {
@@ -185,14 +177,12 @@
                 ...details
             };
             
-            // Optimistic update for UI speed
             globalHistory.unshift(newLog);
             if (globalHistory.length > 200) globalHistory.pop();
             renderGlobalHistory();
 
             if (!db) return;
 
-            // Sync to cloud
             try {
                 const historyDoc = doc(db, 'artifacts', appId, 'public', 'data', 'global_history', 'summary');
                 await setDoc(historyDoc, { logs: globalHistory });
@@ -211,14 +201,12 @@
             return { date: datePart, time: timePart };
         }
         
-        // Tambahan helper untuk mendapatkan string tanggal hari ini (Format YYYY-MM-DD lokal)
         function getTodayDateString() {
             const d = new Date();
             d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
             return d.toISOString().split('T')[0];
         }
 
-        // Tambahan helper untuk mendapatkan string tanggal kemarin
         function getYesterdayDateString() {
             const d = new Date();
             d.setDate(d.getDate() - 1);
@@ -226,7 +214,6 @@
             return d.toISOString().split('T')[0];
         }
 
-        // Tambahan helper untuk update rekap harian
         function updateDailyStats(project, stage, quantityChange) {
             if (!project.dailyStats) project.dailyStats = {};
             const today = getTodayDateString();
@@ -235,7 +222,6 @@
             }
             
             project.dailyStats[today][stage] = (project.dailyStats[today][stage] || 0) + quantityChange;
-            // Cegah nilai harian jadi minus kalau user kebanyakan ngurangin
             if (project.dailyStats[today][stage] < 0) project.dailyStats[today][stage] = 0;
         }
         
@@ -274,13 +260,13 @@
         }
 
         // --- App Actions ---
-
         window.addProject = async (name, totalQuantity, isUrgent, hasPalletStage, targetDate, targetTime) => {
             if (!name || isNaN(totalQuantity) || totalQuantity <= 0) {
                 showNotification('Nama Rakitan dan Jumlah Total harus diisi dengan benar.', 'error');
                 return;
             }
 
+            const nowIso = new Date().toISOString();
             const newProject = {
                 id: 'proj_' + Date.now(),
                 name: name,
@@ -293,10 +279,10 @@
                 qcDone: 0,
                 packingDone: 0,
                 palletDone: 0,
-                createdAt: new Date().toISOString(),
+                createdAt: nowIso,
+                completedAt: null // Menyimpan waktu selesai
             };
             
-            // Firebase Write
             await saveProjectToCloud(newProject);
             await addHistoryLog('CREATE', `Assembly "${name}" has been created.`);
             
@@ -321,7 +307,8 @@
                 project.qcDone = 0;
                 project.packingDone = 0;
                 project.palletDone = 0;
-                project.dailyStats = {}; // Reset rekap harian juga
+                project.dailyStats = {}; 
+                project.completedAt = null; // Reset status waktu selesai
 
                 await addHistoryLog('RESET', `Progress for assembly "${projectName}" has been reset.`);
                 await saveProjectToCloud(project);
@@ -345,6 +332,14 @@
                 project.targetDate = isUrgent ? (targetDate || null) : null;
                 project.targetTime = isUrgent ? (targetTime || null) : null;
                 
+                // Evaluasi ulang status completedAt jika terjadi perubahan total quantity / status selesai
+                const finalStageDone = project.hasPalletStage ? project.palletDone : project.packingDone;
+                if (finalStageDone === project.totalQuantity && project.totalQuantity > 0) {
+                    if (!project.completedAt) project.completedAt = new Date().toISOString();
+                } else {
+                    project.completedAt = null;
+                }
+
                 await addHistoryLog('EDIT', `Details for assembly "${name}" have been updated.`);
                 await saveProjectToCloud(project);
 
@@ -387,10 +382,18 @@
             project[`${stage}Done`] = newValue;
             const actionText = quantityChange > 0 ? 'increased' : 'decreased';
             
-            // Catat ke rekap harian
             updateDailyStats(project, stage, quantityChange);
+
+            // Cek status penyelesaian akhir untuk mengunci waktu selesai
+            const finalStageDone = project.hasPalletStage ? project.palletDone : project.packingDone;
+            if (finalStageDone === project.totalQuantity && project.totalQuantity > 0) {
+                if (!project.completedAt) {
+                    project.completedAt = new Date().toISOString();
+                }
+            } else {
+                project.completedAt = null; // Aktifkan kembali jika progress dikurangi
+            }
             
-            // Optimistic update
             renderAllProjectsDashboard();
             
             await addHistoryLog('PROGRESS', `${stage.toUpperCase()} for "${project.name}" ${actionText} to ${newValue}.`, { stage: stage });
@@ -440,7 +443,6 @@
             renderGlobalHistory();
         }
 
-        // Modals Handlers
         window.openClearHistoryConfirmModal = () => globalHistory.length === 0 ? showNotification('No history.', 'info') : openModal('clearHistoryConfirmModal');
         
         window.openEditModal = () => {
@@ -520,11 +522,17 @@
             }
 
             const oldValue = project[`${stage}Done`];
-            const quantityChange = newValue - oldValue; // Hitung selisih untuk harian
+            const quantityChange = newValue - oldValue; 
             project[`${stage}Done`] = newValue;
             
-            // Catat selisih manual ke rekap harian
             updateDailyStats(project, stage, quantityChange);
+
+            const finalStageDone = project.hasPalletStage ? project.palletDone : project.packingDone;
+            if (finalStageDone === project.totalQuantity && project.totalQuantity > 0) {
+                if (!project.completedAt) project.completedAt = new Date().toISOString();
+            } else {
+                project.completedAt = null;
+            }
             
             await addHistoryLog('PROGRESS', `${stage.toUpperCase()} manually set to ${newValue}.`, { stage });
             await saveProjectToCloud(project);
@@ -601,6 +609,14 @@
             updateDailyStats(project, 'pallet', quantityChange);
 
             project.palletDone = newItemCount;
+
+            const finalStageDone = project.hasPalletStage ? project.palletDone : project.packingDone;
+            if (finalStageDone === project.totalQuantity && project.totalQuantity > 0) {
+                if (!project.completedAt) project.completedAt = new Date().toISOString();
+            } else {
+                project.completedAt = null;
+            }
+
             await addHistoryLog('PROGRESS', `PALLET set to ${newPalletCount} pallets.`, { stage: 'pallet' });
             await saveProjectToCloud(project);
             closeModal('manualPalletInputModal');
@@ -610,7 +626,6 @@
             if (!project || typeof project.totalQuantity === 'undefined') return { status: 'Invalid', color: 'red', progress: 0 };
             const finalStageDone = project.hasPalletStage ? project.palletDone : project.packingDone;
             
-            // Kalkulasi progress dihitung berdasarkan total iterasi setiap langkah (Rakit -> QC -> Packing)
             const numStages = project.hasPalletStage ? 4 : 3;
             const totalSteps = project.totalQuantity * numStages;
             const completedSteps = project.rakitDone + project.qcDone + project.packingDone + (project.hasPalletStage ? project.palletDone : 0);
@@ -677,7 +692,6 @@
             renderDashboardHeader();
 
             if (projects.length === 0) {
-                // Keep header visible so we see clock
                 if (gridContainer) gridContainer.classList.add('hidden'); 
                 listContainer.innerHTML = '';
                 detailedView.classList.add('hidden');
@@ -802,6 +816,13 @@
             const urgentTag = project.isUrgent ? `<span class="blinking-urgent text-sm font-bold py-1 px-3 rounded-full bg-red-500 text-white ml-3">URGENT</span>` : '';
             const detailsContainer = document.getElementById('assembly-details-container');
 
+            // Hitung durasi/rentang hari pengerjaan (dari createdAt sampai completedAt atau hari ini)
+            const createdDate = new Date(project.createdAt || Date.now());
+            const endOrNowDate = project.completedAt ? new Date(project.completedAt) : new Date();
+            const diffTime = Math.abs(endOrNowDate - createdDate);
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            const durationLabel = diffDays <= 1 ? '1 Hari' : `${diffDays} Hari`;
+
             detailsContainer.innerHTML = `
                 <h2 class="text-lg font-bold text-gray-100 mb-1" id="project-name-display">
                     <div class="flex items-center justify-between w-full">
@@ -817,9 +838,9 @@
                         </div>
                     </div>
                 </h2>
-                <div class="mt-2 grid grid-cols-[max-content_auto] gap-x-4 gap-y-1">
-                    <span class="text-xs text-gray-400">Total Target Quantity:</span>
-                    <span class="text-xs text-gray-400"><span class="font-extrabold text-lime-400">${project.totalQuantity.toLocaleString('en-US')}</span> Units</span>
+                <div class="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                    <div><span class="text-gray-400">Total Target Quantity:</span> <span class="font-extrabold text-lime-400">${project.totalQuantity.toLocaleString('en-US')}</span> Units</div>
+                    <div><span class="text-gray-400">Durasi Pengerjaan:</span> <span class="font-extrabold text-teal-300">${durationLabel}</span> <span class="text-gray-500">(${createdDate.toLocaleDateString('id-ID')} s.d. ${project.completedAt ? new Date(project.completedAt).toLocaleDateString('id-ID') : 'Sekarang'})</span></div>
                 </div>
             `;
             
@@ -860,28 +881,49 @@
             if (typeof ChartDataLabels !== 'undefined' && Chart.registry.plugins.get('datalabels') === undefined) Chart.register(ChartDataLabels);
             if (chartInstance) chartInstance.destroy();
 
-            // Memasukkan teks Rekapitulasi Rakitan Harian di atas Chart
+            // Memasukkan teks Rekapitulasi Rakitan Harian di atas Chart (berhenti ketika complete)
             const dailySummaryContainer = document.getElementById('daily-summary-container');
             if (dailySummaryContainer) {
-                // Tanggal Hari Ini (Format diperpendek agar muat bersebelahan di HP)
-                const nowDaily = new Date();
-                const dateTodayFormatted = nowDaily.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
-                const todayStr = getTodayDateString();
-                const dailyStatsToday = project.dailyStats && project.dailyStats[todayStr] ? project.dailyStats[todayStr] : { rakit: 0, qc: 0, packing: 0, pallet: 0 };
-                
-                // Tanggal Kemarin
-                const yesterdayDaily = new Date();
-                yesterdayDaily.setDate(yesterdayDaily.getDate() - 1);
-                const dateYesterdayFormatted = yesterdayDaily.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
-                const yesterdayStr = getYesterdayDateString();
-                const dailyStatsYesterday = project.dailyStats && project.dailyStats[yesterdayStr] ? project.dailyStats[yesterdayStr] : { rakit: 0, qc: 0, packing: 0, pallet: 0 };
+                const finalStageDone = project.hasPalletStage ? project.palletDone : project.packingDone;
+                const isComplete = finalStageDone === project.totalQuantity && project.totalQuantity > 0;
+
+                let dateTodayFormatted, dateYesterdayFormatted, dailyStatsToday, dailyStatsYesterday;
+
+                if (isComplete && project.completedAt) {
+                    // Jika sudah complete, bekukan waktu rekap pada tanggal penyelesaian (completedAt)
+                    const compDate = new Date(project.completedAt);
+                    dateTodayFormatted = compDate.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+                    const compDateStr = project.completedAt.split('T')[0];
+                    dailyStatsToday = project.dailyStats && project.dailyStats[compDateStr] ? project.dailyStats[compDateStr] : { rakit: 0, qc: 0, packing: 0, pallet: 0 };
+                    
+                    const yDate = new Date(compDate);
+                    yDate.setDate(yDate.getDate() - 1);
+                    dateYesterdayFormatted = yDate.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+                    const yDateStr = yDate.toISOString().split('T')[0];
+                    dailyStatsYesterday = project.dailyStats && project.dailyStats[yDateStr] ? project.dailyStats[yDateStr] : { rakit: 0, qc: 0, packing: 0, pallet: 0 };
+                } else {
+                    // Berjalan normal real-time
+                    const nowDaily = new Date();
+                    dateTodayFormatted = nowDaily.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+                    const todayStr = getTodayDateString();
+                    dailyStatsToday = project.dailyStats && project.dailyStats[todayStr] ? project.dailyStats[todayStr] : { rakit: 0, qc: 0, packing: 0, pallet: 0 };
+                    
+                    const yesterdayDaily = new Date();
+                    yesterdayDaily.setDate(yesterdayDaily.getDate() - 1);
+                    dateYesterdayFormatted = yesterdayDaily.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+                    const yesterdayStr = getYesterdayDateString();
+                    dailyStatsYesterday = project.dailyStats && project.dailyStats[yesterdayStr] ? project.dailyStats[yesterdayStr] : { rakit: 0, qc: 0, packing: 0, pallet: 0 };
+                }
+
+                const completeNoticeHTML = isComplete ? `<div class="mb-2 text-xs font-bold text-green-400 bg-green-950/40 border border-green-800 py-1 px-3 rounded-lg inline-block">Status: COMPLETED (Rekapitulasi terkunci pada hari penyelesaian)</div>` : '';
 
                 dailySummaryContainer.innerHTML = `
+                    ${completeNoticeHTML}
                     <div class="grid grid-cols-2 gap-2 sm:gap-6 divide-x divide-gray-700 w-full mb-4">
-                        <!-- Hari Sebelumnya -->
+                        <!-- Hari Sebelumnya / Selesai -->
                         <div class="text-left pr-2 sm:pr-4 flex flex-col items-end">
                             <div>
-                                <h4 class="text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 border-b border-gray-700 pb-1">Hari Sebelumnya</h4>
+                                <h4 class="text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 border-b border-gray-700 pb-1">${isComplete ? 'Hari Sebelum Selesai' : 'Hari Sebelumnya'}</h4>
                                 <div class="text-[11px] sm:text-sm text-gray-300 space-y-1">
                                     <div><span class="text-gray-400 w-16 sm:w-20 inline-block">Tanggal</span> <span class="mx-1">:</span> <span class="font-medium text-gray-200">${dateYesterdayFormatted}</span></div>
                                     <div><span class="text-gray-400 w-16 sm:w-20 inline-block">Rakit</span> <span class="mx-1">:</span> <span class="font-bold text-blue-400/70">${dailyStatsYesterday.rakit}</span></div>
@@ -892,10 +934,10 @@
                             </div>
                         </div>
 
-                        <!-- Hari Ini -->
+                        <!-- Hari Ini / Hari Penyelesaian -->
                         <div class="text-left pl-2 sm:pl-4 flex flex-col items-start">
                             <div>
-                                <h4 class="text-[10px] sm:text-xs font-bold text-indigo-400 uppercase tracking-wider mb-2 border-b border-indigo-900/50 pb-1">Hari Ini</h4>
+                                <h4 class="text-[10px] sm:text-xs font-bold text-indigo-400 uppercase tracking-wider mb-2 border-b border-indigo-900/50 pb-1">${isComplete ? 'Hari Penyelesaian (Complete)' : 'Hari Ini'}</h4>
                                 <div class="text-[11px] sm:text-sm text-gray-100 space-y-1">
                                     <div><span class="text-gray-400 w-16 sm:w-20 inline-block">Tanggal</span> <span class="mx-1">:</span> <span class="font-semibold text-white">${dateTodayFormatted}</span></div>
                                     <div><span class="text-gray-400 w-16 sm:w-20 inline-block">Rakit</span> <span class="mx-1">:</span> <span class="font-extrabold text-blue-400">${dailyStatsToday.rakit}</span></div>
@@ -919,7 +961,6 @@
                 chartColors.push('#8b5cf6');
             }
             
-            // Pending data for stacked bar
             const chartDataPending = chartDataDone.map(done => project.totalQuantity - done);
 
             chartInstance = new Chart(ctx, {
@@ -934,7 +975,7 @@
                             backgroundColor: chartColors, 
                             borderRadius: 6, 
                             datalabels: { 
-                                display: function(context) { return context.dataset.data[context.dataIndex] > 0; }, // Hide 0 data labels
+                                display: function(context) { return context.dataset.data[context.dataIndex] > 0; }, 
                                 color: 'white', 
                                 anchor: 'end', 
                                 align: 'start' 
@@ -967,13 +1008,11 @@
                 const available = stage.max - stage.current;
                 const progressPercent = project.totalQuantity > 0 ? Math.round((stage.current / project.totalQuantity) * 100) : 0;
                 
-                // Button States
                 const canInc = stage.id === 'rakit' ? stage.current < stage.max : available > 0;
                 const canDec = stage.current > 0;
                 const incClass = canInc ? `bg-${stage.color}-600 hover:bg-${stage.color}-500` : 'bg-gray-600 cursor-not-allowed';
                 const decClass = canDec ? 'bg-red-600 hover:bg-red-500' : 'bg-gray-700 cursor-not-allowed';
 
-                // Special case for Pallet logic override
                 if (stage.id === 'pallet') {
                     const numPallets = Math.ceil(stage.current / 2);
                     const maxPallets = Math.ceil(project.totalQuantity / 2);
@@ -1047,14 +1086,12 @@
 
         // Init
         window.onload = () => {
-            initFirebase(); // Connect to cloud
+            initFirebase(); 
             
-            // Listeners
             document.getElementById('btnAddProject').onclick = () => openModal('addProjectModal');
             document.getElementById('closeModalBtn').onclick = () => closeModal('addProjectModal');
             document.getElementById('projectForm').onsubmit = window.handleAddProjectSubmit;
             
-            // Add other event listeners...
             document.getElementById('projectUrgent').addEventListener('change', (e) => document.getElementById('urgent-options').classList.toggle('hidden', !e.target.checked));
             document.getElementById('editProjectUrgent').addEventListener('change', (e) => document.getElementById('edit-urgent-options').classList.toggle('hidden', !e.target.checked));
 
@@ -1110,8 +1147,7 @@
         </div>
     </div>
 
-    <!-- Modals (Add, Edit, Delete, History, dll.) -->
-    <!-- Add Project Modal -->
+    <!-- Modals -->
     <div id="addProjectModal" class="modal fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 opacity-0 pointer-events-none p-4">
         <div class="bg-gray-800 rounded-xl shadow-2xl w-full max-w-lg">
             <div class="p-6 border-b flex justify-between items-center border-gray-700">
